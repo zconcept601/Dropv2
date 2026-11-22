@@ -7,12 +7,292 @@
 <title>DropAffy</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/style.css">
+<style>
+:root{--ink:#10202F;--mut:#56657A;--bg:#F1F5FA;--card:#fff;--g:#1553B6;--gd:#0E3F8F;--sun:#F4B400;--line:#D8E1EC;--red:#B3261E}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 'Plus Jakarta Sans',system-ui,sans-serif;padding-bottom:84px}
+main{max-width:640px;margin:0 auto;padding:16px}
+h1{font-size:1.5rem;margin:8px 0 16px;font-weight:800}h2{font-size:1.1rem;margin:20px 0 8px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;margin:0 0 10px;display:block;color:inherit;text-decoration:none}
+a.card:hover{border-color:var(--g)}
+.hero{background:var(--g);color:#fff;border:0;border-radius:18px;padding:20px}
+.hero b{display:block;font-size:2rem;font-weight:800}.hero small{opacity:.85}
+.hero a{color:var(--sun);font-weight:600}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.stat b{display:block;font-size:1.4rem}.mut{color:var(--mut);font-size:.9rem}
+input,textarea,select,button{font:inherit;width:100%;padding:12px;border:1px solid var(--line);border-radius:10px;background:#fff;color:var(--ink);margin:4px 0 10px}
+button,.btn{background:var(--g);color:#fff;border:0;font-weight:600;cursor:pointer;width:auto;padding:10px 16px;margin:4px 6px 4px 0;border-radius:10px}
+button.full{width:100%}button.alt{background:#fff;color:var(--g);border:1px solid var(--g)}button.bad{background:var(--red)}
+:focus-visible{outline:3px solid var(--sun);outline-offset:2px}
+.tag{display:inline-block;font-size:.8rem;padding:2px 8px;border-radius:99px;background:#E3ECFA;color:var(--gd);margin-right:6px}
+.tag.s{background:#FFF1C7;color:#6B4E00}
+nav{position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:1px solid var(--line);display:flex;padding-bottom:env(safe-area-inset-bottom)}
+nav a{flex:1;text-align:center;padding:12px 4px;color:var(--mut);text-decoration:none;font-size:.85rem;font-weight:600}
+nav a.on{color:var(--g);box-shadow:inset 0 3px 0 var(--g)}
+#toast{position:fixed;top:12px;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 16px;border-radius:10px;z-index:9;max-width:92%;display:none}
+.row{display:flex;justify-content:space-between;gap:10px;align-items:center}
+.unread{border-left:4px solid var(--sun)}
+[hidden]{display:none!important}
+.tile{min-height:96px}.tile p{margin:6px 0 0}
+@media(min-width:900px){main{max-width:760px}}
+@media(prefers-reduced-motion:reduce){*{transition:none!important}}
+
+</style>
 </head>
 <body>
 <div id="toast" role="status"></div>
 <main id="app"></main>
 <nav id="nav" aria-label="Navigation principale" hidden></nav>
-<script type="module" src="src/main.js"></script>
+<script type="module">
+import {createClient} from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/+esm';
+// ===== src/config.js =====
+// Clé PUBLIQUE uniquement. Jamais de clé service_role dans le navigateur.
+const SUPABASE_URL = 'https://gawppzkswaszrqbsazby.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_IPsMYGWKaOGMxLO6I6z_Ng_KqOEOBxj';
+
+// ===== src/constants.js =====
+// Modules : seul le statut 'ready' ouvre un écran réel. Rien n'est simulé.
+const MODULES = [
+  {id:'centrale', name:'La Centrale', desc:'Catalogue, affiliation et commissions', status:'soon'},
+  {id:'immobilier', name:'Immobilier', desc:'Terrains, parcelles et logements à vendre ou à louer', status:'soon'},
+  {id:'transport', name:'Transport', desc:'Transport, livraison et déménagement', status:'soon'},
+  {id:'dropads', name:'DropAds', desc:'Campagnes publicitaires et diffuseurs', status:'soon'},
+  {id:'dropalgo', name:'DropAlgo', desc:'Aide au rapprochement des besoins et offres', status:'soon'},
+];
+const STATUS = {pending:'En attente', approved:'Publiée', rejected:'Refusée', expired:'Expirée', fulfilled:'Satisfaite'};
+
+// ===== src/contexts/state.js =====
+const state = {me:null, isAdmin:false, feedTab:'offer'};
+
+// ===== src/utils/format.js =====
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fcfa = n => new Intl.NumberFormat('fr-FR').format(n || 0) + ' FCFA';
+const dt = d => new Date(d).toLocaleString('fr-FR', {dateStyle:'short', timeStyle:'short'});
+const norm = p => { let d = String(p).replace(/\D/g, ''); if (d.length === 8) d = '226' + d; return d; };
+const mail = d => `p${d}@users.dropaffy.app`;
+
+// ===== src/components/ui.js =====
+const app = document.getElementById('app');
+const nav = document.getElementById('nav');
+function toast(m) {
+  const t = document.getElementById('toast'); t.textContent = m; t.style.display = 'block';
+  clearTimeout(t._h); t._h = setTimeout(() => t.style.display = 'none', 4500);
+}
+const loading = () => { app.innerHTML = '<p class="card mut" aria-busy="true">Chargement…</p>'; };
+const TABS = [['#/','Accueil'],['#/community','Communauté'],['#/contacts','Contacts'],['#/activity','Activité'],['#/profile','Profil']];
+const active = (u, h) => u === '#/' ? (h === '#/' || h.startsWith('#/m/'))
+  : h === u || (u === '#/community' && (h.startsWith('#/p/') || h === '#/publish'))
+  || (u === '#/activity' && h === '#/wallet') || (u === '#/profile' && h === '#/admin');
+function setNav() {
+  const h = location.hash || '#/'; nav.hidden = false;
+  nav.innerHTML = TABS.map(([u, l]) => `<a href="${u}" class="${active(u, h) ? 'on' : ''}" ${active(u, h) ? 'aria-current="page"' : ''}>${l}</a>`).join('');
+}
+// Anti double-soumission : un bouton cliqué est désactivé brièvement (paiement, demande, publication).
+document.addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  setTimeout(() => { b.disabled = true; }, 0); setTimeout(() => { b.disabled = false; }, 1500);
+});
+
+// ===== src/services/supabase.js =====
+const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
+// Résout une requête Supabase ; affiche l'erreur serveur (déjà en français pour les règles métier) et la relance.
+async function q(p) {
+  let r; try { r = await p; } catch (e) { toast('Connexion instable. Réessayez.'); throw e; }
+  if (r.error) {
+    const e = r.error;
+    if (e.code === 'PGRST301' || /jwt/i.test(e.message)) { toast('Session expirée : reconnectez-vous.'); await sb.auth.signOut(); }
+    else toast(e.message);
+    throw e;
+  }
+  return r.data;
+}
+
+// ===== src/services/auth.js =====
+// L'état admin vient du serveur (is_admin), pas du navigateur.
+async function loadSession() {
+  const {data} = await sb.auth.getSession(); const user = data.session?.user || null; let admin = false;
+  if (user) { const r = await sb.rpc('is_admin'); admin = r.data === true; }
+  return {user, admin};
+}
+
+// ===== src/pages/auth.js =====
+function authView(onDone,mode='login'){
+  nav.hidden=true;const reg=mode==='register';
+  app.innerHTML=`<h1>DropAffy</h1><p class="mut">Besoin, réseau, opportunité.</p>
+  <form id="f" class="card">${reg?'<label>Nom complet<input id="n" required autocomplete="name"></label>':''}
+  <label>Numéro de téléphone<input id="p" type="tel" required autocomplete="tel" placeholder="70 12 34 56"></label>
+  <label>Mot de passe<input id="w" type="password" required minlength="8" autocomplete="${reg?'new-password':'current-password'}"></label>
+  <button class="full">${reg?'Créer mon compte':'Se connecter'}</button></form>
+  <button class="alt full" id="sw">${reg?'J’ai déjà un compte':'Créer un compte'}</button>`;
+  document.getElementById('sw').onclick=()=>authView(onDone,reg?'login':'register');
+  document.getElementById('f').onsubmit=async e=>{e.preventDefault();
+    const d=norm(p.value),email=mail(d);
+    try{
+      if(reg){await q(sb.auth.signUp({email,password:w.value,options:{data:{full_name:n.value.trim(),phone:'+'+d}}}))}
+      else await q(sb.auth.signInWithPassword({email,password:w.value}));
+      onDone();
+    }catch(_){}};
+}
+
+// ===== src/pages/home.js =====
+async function home() {
+  const cnt = (t, f) => { const x = sb.from(t).select('*', {count:'exact', head:true}); return f ? f(x) : x; };
+  const live = t => cnt(t, x => x.eq('user_id', state.me.id).eq('status', 'approved').gt('expires_at', new Date().toISOString()));
+  const [w, qt, mo, ms, rc, ct, nt, po, ps] = await Promise.all([
+    sb.from('wallets').select('balance').maybeSingle(), sb.from('contact_quotas').select('credits').maybeSingle(),
+    live('offers'), live('searches'),
+    cnt('contact_requests', x => x.eq('recipient_id', state.me.id).eq('status', 'pending')), cnt('contacts'),
+    cnt('notifications', x => x.eq('is_read', false)),
+    state.isAdmin ? cnt('offers', x => x.eq('status', 'pending')) : {count:0},
+    state.isAdmin ? cnt('searches', x => x.eq('status', 'pending')) : {count:0}]);
+  const todo = (po.count || 0) + (ps.count || 0);
+  app.innerHTML = `<div class="card hero"><small>Mon portefeuille</small><b>${fcfa(w.data?.balance)}</b>
+   <small>${qt.data?.credits ?? 0} mises en relation disponibles · <a href="#/wallet">Détails</a></small></div>
+  <div class="grid"><a class="card stat" href="#/community"><b>${(mo.count || 0) + (ms.count || 0)}</b><span class="mut">Publications actives</span></a>
+  <a class="card stat" href="#/activity"><b>${rc.count || 0}</b><span class="mut">Demandes à traiter</span></a>
+  <a class="card stat" href="#/contacts"><b>${ct.count || 0}</b><span class="mut">Contacts obtenus</span></a>
+  <a class="card stat" href="#/activity"><b>${nt.count || 0}</b><span class="mut">Notifications non lues</span></a></div>
+  ${state.isAdmin ? `<a class="card" href="#/admin"><b>${todo}</b> publication(s) à valider · Administration</a>` : ''}
+  <p><a class="btn" href="#/publish">Publier une offre ou une recherche</a></p>
+  <h2>Modules</h2><div class="grid">${MODULES.map(m => `<a class="card tile" href="#/${m.status === 'ready' ? m.id : 'm/' + m.id}"><b>${esc(m.name)}</b>
+   ${m.status === 'ready' ? '' : '<br><span class="tag s">En préparation</span>'}<p class="mut">${esc(m.desc)}</p></a>`).join('')}</div>`;
+}
+
+// ===== src/pages/community.js =====
+async function community() {
+  const feed = t => sb.from(t).select('*').eq('status', 'approved').order('created_at', {ascending:false}).limit(30);
+  const mine = t => sb.from(t).select('id,title,status,expires_at').eq('user_id', state.me.id).order('created_at', {ascending:false}).limit(20);
+  const [o, s, mo, ms] = await Promise.all([feed('offers'), feed('searches'), mine('offers'), mine('searches')]);
+  const tab = state.feedTab, list = (tab === 'offer' ? o : s).data || [];
+  const my = [...(mo.data || []).map(x => ({...x, k:'offer'})), ...(ms.data || []).map(x => ({...x, k:'search'}))];
+  app.innerHTML = `<div class="row"><h1>Communauté</h1><a class="btn" href="#/publish">Publier</a></div>
+  <div><button class="${tab === 'offer' ? '' : 'alt'}" data-t="offer">Offres</button><button class="${tab === 'search' ? '' : 'alt'}" data-t="search">Recherches</button></div>
+  ${list.map(r => `<a class="card" href="#/p/${tab}/${r.id}"><b>${esc(r.title)}</b><br><span class="tag">${esc(r.category || 'Général')}</span><span class="mut">${esc(r.city || '')}</span>
+   <p class="mut" style="margin:6px 0 0">${esc(r.description).slice(0, 110)}</p></a>`).join('') || '<p class="card mut">Aucune publication validée pour le moment. Publiez la première.</p>'}
+  <h2>Mes publications</h2>${my.map(x => `<a class="card row" href="#/p/${x.k}/${x.id}"><span>${esc(x.title)}</span><span class="tag s">${esc(STATUS[x.status] || x.status)}</span></a>`).join('') || '<p class="card mut">Vous n’avez rien publié.</p>'}`;
+  app.querySelectorAll('[data-t]').forEach(b => b.onclick = () => { state.feedTab = b.dataset.t; community(); });
+}
+
+// ===== src/pages/publish.js =====
+function publish(){
+  app.innerHTML=`<h1>Publier</h1><form id="f" class="card"><label>Type<select id="t"><option value="offer">Je propose (offre, service)</option><option value="search">Je cherche (fournisseur, prestataire)</option></select></label>
+  <label>Titre<input id="ti" required maxlength="120"></label><label>Description<textarea id="d" rows="5" required></textarea></label>
+  <label>Catégorie<input id="c" placeholder="Électroménager, transport…"></label><label>Ville<input id="v" placeholder="Ouagadougou"></label>
+  <button class="full">Envoyer pour validation</button>
+  <p class="mut">Pas d’annonce immobilière, de produit pour La Centrale ni de recherche d’emploi. Une fois validée, la publication reste visible 2 jours.</p></form>`;
+  document.getElementById('f').onsubmit=async e=>{e.preventDefault();
+    try{await q(sb.from(t.value==='offer'?'offers':'searches').insert({user_id:state.me.id,title:ti.value.trim(),description:d.value.trim(),category:c.value.trim()||null,city:v.value.trim()||null}));
+    toast('Publication envoyée : en attente de validation.');location.hash='#/'}catch(_){}};
+}
+
+// ===== src/pages/detail.js =====
+async function detail(type,id){
+  const r=await q(sb.from(type==='offer'?'offers':'searches').select('*').eq('id',id).single());
+  const mine=r.user_id===state.me.id;
+  app.innerHTML=`<a href="#/community">← Retour</a><h1>${esc(r.title)}</h1>
+  <p><span class="tag${type==='search'?' s':''}">${type==='offer'?'Offre':'Recherche'}</span><span class="tag">${esc(r.category||'Général')}</span><span class="mut">${esc(r.city||'')}</span></p>
+  <div class="card">${esc(r.description).replace(/\n/g,'<br>')}</div>
+  <p class="mut">Visible jusqu’au ${dt(r.expires_at)}${mine?' · Statut : '+esc(r.status):''}</p>
+  ${mine?'<p class="card">Ceci est votre publication.</p>':`<form id="cr" class="card"><label>Message (facultatif)<textarea id="m" rows="3"></textarea></label>
+  <button class="full">Demander une mise en relation</button>
+  <p class="mut">Vous ne payez rien. Les coordonnées sont partagées si l’auteur accepte.</p></form>`}`;
+  if(!mine)document.getElementById('cr').onsubmit=async e=>{e.preventDefault();
+    try{await q(sb.from('contact_requests').insert({requester_id:state.me.id,recipient_id:r.user_id,source_type:type,source_id:id,message:m.value.trim()||null}));
+    toast('Demande envoyée.');location.hash='#/activity'}catch(_){}};
+}
+
+// ===== src/pages/contacts.js =====
+async function contacts(){
+  const cs=await q(sb.from('contacts').select('*').order('created_at',{ascending:false}));
+  const rows=await Promise.all(cs.map(async c=>{const o=c.user_a===state.me.id?c.user_b:c.user_a;
+    const {data}=await sb.rpc('get_contact_details',{p_user_id:o});return data?.[0]}));
+  app.innerHTML=`<h1>Contacts</h1>`+(rows.filter(Boolean).map(r=>`<div class="card"><b>${esc(r.full_name)}</b> <span class="mut">${esc(r.professional_title||'')} ${esc(r.city||'')}</span><br>
+   <a class="btn" href="tel:${esc(r.phone)}">Appeler</a><a class="btn alt" style="background:#fff;color:var(--g);border:1px solid var(--g)" href="https://wa.me/${esc(String(r.phone).replace(/\D/g,''))}">WhatsApp</a></div>`).join('')||'<p class="card mut">Vos mises en relation validées apparaîtront ici avec les coordonnées.</p>');
+}
+
+// ===== src/pages/activity.js =====
+async function activity(){
+  const [rq,nt,qt]=await Promise.all([sb.from('contact_requests').select('*').order('created_at',{ascending:false}).limit(50),
+    sb.from('notifications').select('*').order('created_at',{ascending:false}).limit(30),sb.from('contact_quotas').select('credits').maybeSingle()]);
+  const R=(rq.data||[]).filter(r=>r.recipient_id===state.me.id||r.requester_id===state.me.id);
+  const st={pending:'En attente',accepted:'Acceptée',rejected:'Refusée',cancelled:'Annulée'};
+  app.innerHTML=`<h1>Activité</h1><div class="card"><div class="row"><div><b>${qt.data?.credits??0}</b> mises en relation restantes<br><span class="mut">Au-delà : 100 FCFA pour 5 de plus</span></div><button id="buy">Payer 100 FCFA</button></div></div>
+  <h2>Demandes</h2>${R.map(r=>{const rec=r.recipient_id===state.me.id;return `<div class="card"><span class="tag">${rec?'Reçue':'Envoyée'}</span><span class="tag s">${st[r.status]}</span> <span class="mut">${dt(r.created_at)}</span>
+   <p>${esc(r.message||'(sans message)')}</p>${r.status==='pending'?(rec?`<button data-a="accepted" data-i="${r.id}">Accepter</button><button class="alt" data-a="rejected" data-i="${r.id}">Refuser</button>`:`<button class="alt" data-a="cancelled" data-i="${r.id}">Annuler</button>`):''}</div>`}).join('')||'<p class="card mut">Aucune demande.</p>'}
+  <h2>Notifications</h2>${(nt.data||[]).map(n=>`<div class="card ${n.is_read?'':'unread'}"><b>${esc(n.title)}</b><br><span class="mut">${esc(n.message||'')}</span></div>`).join('')||'<p class="card mut">Rien de nouveau.</p>'}`;
+  document.getElementById('buy').onclick=async()=>{if(!confirm('Débiter 100 FCFA de votre portefeuille pour 5 mises en relation ?'))return;try{await q(sb.rpc('buy_contact_credits'));toast('5 mises en relation ajoutées.');activity()}catch(_){}};
+  app.querySelectorAll('[data-a]').forEach(b=>b.onclick=async()=>{if(b.dataset.a==='accepted'&&!confirm('Accepter ? Un crédit de mise en relation sera utilisé.'))return;try{await q(sb.from('contact_requests').update({status:b.dataset.a}).eq('id',b.dataset.i));activity()}catch(_){}});
+  if((nt.data||[]).some(n=>!n.is_read))sb.from('notifications').update({is_read:true}).eq('is_read',false).then(()=>{});
+}
+
+// ===== src/pages/wallet.js =====
+async function wallet(){
+  const [w,t]=await Promise.all([sb.from('wallets').select('balance').maybeSingle(),sb.from('wallet_transactions').select('*').order('created_at',{ascending:false}).limit(50)]);
+  app.innerHTML=`<a href="#/activity">← Retour</a><h1>Portefeuille</h1><div class="card hero"><small>Solde</small><b>${fcfa(w.data?.balance)}</b>
+  <small>Le rechargement par Mobile Money sera ajouté prochainement.</small></div><h2>Historique</h2>
+  ${(t.data||[]).map(x=>`<div class="card row"><div>${esc(x.description||x.transaction_type)}<br><span class="mut">${dt(x.created_at)} · ${esc(x.status)}</span></div><b>${['credit','refund','commission'].includes(x.transaction_type)?'+':'−'}${fcfa(x.amount)}</b></div>`).join('')||'<p class="card mut">Aucune opération.</p>'}`;
+}
+
+// ===== src/pages/profile.js =====
+async function profile(){
+  const p=await q(sb.from('profiles').select('*').eq('id',state.me.id).single());
+  app.innerHTML=`<h1>Profil</h1><form id="f" class="card"><label>Nom complet<input id="a" value="${esc(p.full_name)}" required></label>
+  <label>Titre professionnel<input id="b" value="${esc(p.professional_title||'')}"></label><label>Ville<input id="c" value="${esc(p.city||'')}"></label>
+  <label>À propos<textarea id="d" rows="3">${esc(p.bio||'')}</textarea></label><p class="mut">Téléphone : ${esc(p.phone||'')} (non visible publiquement)</p>
+  <button class="full">Enregistrer</button></form><a class="card" href="#/wallet">Portefeuille</a>${state.isAdmin?'<a class="card" href="#/admin">Administration</a>':''}
+  <button class="alt full" id="out">Se déconnecter</button>`;
+  document.getElementById('f').onsubmit=async e=>{e.preventDefault();
+    try{await q(sb.from('profiles').update({full_name:a.value.trim(),professional_title:b.value.trim()||null,city:c.value.trim()||null,bio:d.value.trim()||null}).eq('id',state.me.id));toast('Profil enregistré.')}catch(_){}};
+  document.getElementById('out').onclick=async()=>{await sb.auth.signOut()};
+}
+
+// ===== src/pages/admin.js =====
+async function admin(){
+  const [o,s,m,l]=await Promise.all([sb.from('offers').select('*').eq('status','pending'),sb.from('searches').select('*').eq('status','pending'),
+    sb.from('profiles').select('id,full_name,phone,account_status').order('created_at',{ascending:false}).limit(50),sb.from('admin_logs').select('*').order('created_at',{ascending:false}).limit(15)]);
+  const P=[...(o.data||[]).map(x=>({...x,k:'offer'})),...(s.data||[]).map(x=>({...x,k:'search'}))];
+  app.innerHTML=`<a href="#/profile">← Profil</a><h1>Administration</h1><h2>À valider (${P.length})</h2>
+  ${P.map(x=>`<div class="card"><span class="tag${x.k==='search'?' s':''}">${x.k==='offer'?'Offre':'Recherche'}</span><b>${esc(x.title)}</b><p class="mut">${esc(x.description)}</p>
+   <button data-m="approved" data-k="${x.k}" data-i="${x.id}">Valider</button><button class="bad" data-m="rejected" data-k="${x.k}" data-i="${x.id}">Refuser</button></div>`).join('')||'<p class="card mut">Rien en attente.</p>'}
+  <h2>Membres</h2>${(m.data||[]).map(x=>`<div class="card"><b>${esc(x.full_name)}</b> <span class="mut">${esc(x.phone||'')} · ${esc(x.account_status)}</span><br>
+   <button class="alt" data-cr="${x.id}">Créditer</button><button class="alt" data-su="${x.id}" data-s="${x.account_status==='active'?'suspended':'active'}">${x.account_status==='active'?'Suspendre':'Réactiver'}</button></div>`).join('')}
+  <h2>Journal</h2>${(l.data||[]).map(x=>`<div class="card mut">${dt(x.created_at)} · ${esc(x.action)}</div>`).join('')}`;
+  app.querySelectorAll('[data-m]').forEach(b=>b.onclick=async()=>{let why=null;
+    if(b.dataset.m==='rejected'){why=prompt('Motif du refus ?');if(!why)return}
+    try{await q(sb.rpc('admin_moderate_publication',{p_type:b.dataset.k,p_id:b.dataset.i,p_decision:b.dataset.m,p_reason:why}));admin()}catch(_){}});
+  app.querySelectorAll('[data-cr]').forEach(b=>b.onclick=async()=>{const a=parseInt(prompt('Montant en FCFA ?'),10),ref=prompt('Référence du paiement reçu ?');if(!a||!ref)return;
+    try{await q(sb.rpc('admin_credit_wallet',{p_user_id:b.dataset.cr,p_amount:a,p_reference:ref}));toast('Portefeuille crédité.');admin()}catch(_){}});
+  app.querySelectorAll('[data-su]').forEach(b=>b.onclick=async()=>{const why=prompt('Motif ?');if(!why)return;
+    try{await q(sb.rpc('admin_set_account_status',{p_user_id:b.dataset.su,p_new_status:b.dataset.s,p_reason:why}));admin()}catch(_){}});
+}
+
+// ===== src/pages/soon.js =====
+function soon(id) {
+  const m = MODULES.find(x => x.id === id);
+  app.innerHTML = m ? `<a href="#/">← Retour</a><h1>${esc(m.name)}</h1><div class="card"><span class="tag s">En préparation</span>
+  <p>${esc(m.desc)}.</p><p class="mut">Ce module ouvrira quand ses tables, règles et permissions serveur seront prêtes. Rien n’est simulé.</p></div>`
+    : '<p class="card">Module introuvable.</p>';
+}
+
+// ===== src/main.js =====
+const ROUTES = {'':home, community, publish, contacts, activity, wallet, profile, admin, p:detail, m:soon};
+
+async function route() {
+  if (!state.me) return authView(boot);
+  setNav();
+  const [, k = '', a, b] = (location.hash || '#/').split('/');
+  if (k === 'admin' && !state.isAdmin) { app.innerHTML = '<p class="card">Accès refusé : réservé aux administrateurs.</p>'; return; }
+  const fn = ROUTES[k];
+  if (!fn) { app.innerHTML = '<p class="card">Page introuvable.</p>'; return; }
+  loading();
+  try { await fn(a, b); }
+  catch (_) { app.innerHTML = '<p class="card">Impossible de charger cet écran. Vérifiez votre connexion puis réessayez.</p>'; }
+}
+async function boot() { const s = await loadSession(); state.me = s.user; state.isAdmin = s.admin; route(); }
+
+window.addEventListener('hashchange', route);
+sb.auth.onAuthStateChange(ev => { if (ev === 'SIGNED_OUT') { state.me = null; state.isAdmin = false; route(); } });
+boot();
+</script>
 </body>
 </html>
