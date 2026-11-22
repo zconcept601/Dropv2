@@ -1,0 +1,28 @@
+Voici le code style.css : :root{--ink:#10202F;--mut:#56657A;--bg:#F1F5FA;--card:#fff;--g:#1553B6;--gd:#0E3F8F;--sun:#F4B400;--line:#D8E1EC;--red:#B3261E}
+{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 'Plus Jakarta Sans',system-ui,sans-serif;padding-bottom:84px}
+main{max-width:640px;margin:0 auto;padding:16px}
+h1{font-size:1.5rem;margin:8px 0 16px;font-weight:800}h2{font-size:1.1rem;margin:20px 0 8px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;margin:0 0 10px;display:block;color:inherit;text-decoration:none}
+a.card:hover{border-color:var(--g)}
+.hero{background:var(--g);color:#fff;border:0;border-radius:18px;padding:20px}
+.hero b{display:block;font-size:2rem;font-weight:800}.hero small{opacity:.85}
+.hero a{color:var(--sun);font-weight:600}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.stat b{display:block;font-size:1.4rem}.mut{color:var(--mut);font-size:.9rem}
+input,textarea,select,button{font:inherit;width:100%;padding:12px;border:1px solid var(--line);border-radius:10px;background:#fff;color:var(--ink);margin:4px 0 10px}
+button,.btn{background:var(--g);color:#fff;border:0;font-weight:600;cursor:pointer;width:auto;padding:10px 16px;margin:4px 6px 4px 0;border-radius:10px}
+button.full{width:100%}button.alt{background:#fff;color:var(--g);border:1px solid var(--g)}button.bad{background:var(--red)}
+:focus-visible{outline:3px solid var(--sun);outline-offset:2px}
+.tag{display:inline-block;font-size:.8rem;padding:2px 8px;border-radius:99px;background:#E3ECFA;color:var(--gd);margin-right:6px}
+.tag.s{background:#FFF1C7;color:#6B4E00}
+nav{position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:1px solid var(--line);display:flex;padding-bottom:env(safe-area-inset-bottom)}
+nav a{flex:1;text-align:center;padding:12px 4px;color:var(--mut);text-decoration:none;font-size:.85rem;font-weight:600}
+nav a.on{color:var(--g);box-shadow:inset 0 3px 0 var(--g)}
+#toast{position:fixed;top:12px;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 16px;border-radius:10px;z-index:9;max-width:92%;display:none}
+.row{display:flex;justify-content:space-between;gap:10px;align-items:center}
+.unread{border-left:4px solid var(--sun)}
+[hidden]{display:none!important}
+.tile{min-height:96px}.tile p{margin:6px 0 0}
+@media(min-width:900px){main{max-width:760px}}
+@media(prefers-reduced-motion:reduce){{transition:none!important}}
