@@ -67,13 +67,12 @@ const SUPABASE_KEY = 'sb_publishable_IPsMYGWKaOGMxLO6I6z_Ng_KqOEOBxj';
 
 // ===== src/constants.js =====
 // Modules : seul le statut 'ready' ouvre un écran réel. Rien n'est simulé.
-// adminOnly : visible uniquement pour un administrateur (rôle lu côté serveur).
 const MODULES = [
-  {id:'centrale', name:'La Centrale', icon:'store', desc:'Catalogue, affiliation et commissions', status:'ready'},
+  {id:'community', name:'Communauté', icon:'community', desc:'Offres, recherches et mises en relation', status:'ready'},
+  {id:'centrale', name:'La Centrale', icon:'store', desc:'Catalogue de produits, revente et commissions', status:'ready'},
   {id:'immobilier', name:'Immobilier', icon:'building', desc:'Terrains, parcelles et logements', status:'ready'},
   {id:'transport', name:'Transport', icon:'truck', desc:'Transport, livraison et déménagement', status:'ready'},
-  {id:'dropads', name:'DropAds', icon:'megaphone', desc:'Campagnes publicitaires et diffuseurs', status:'soon'},
-  {id:'dropalgo', name:'DropAlgo', icon:'spark', desc:'Aide au rapprochement des besoins et offres', status:'soon', adminOnly:true},
+  {id:'dropads', name:'DropAds', icon:'megaphone', desc:'Gagnez de l’argent en partageant des offres ou des services', status:'soon'},
 ];
 const STATUS = {pending:'En attente', approved:'Publiée', rejected:'Refusée', expired:'Expirée', fulfilled:'Satisfaite'};
 
@@ -108,7 +107,7 @@ const P = {
   spark:'<path d="M12 3l2 5 5 2-5 2-2 5-2-5-5-2 5-2z"/>'};
 const icon = n => `<svg viewBox="0 0 24 24" aria-hidden="true">${P[n] || ''}</svg>`;
 const TABS = [['#/','Accueil','home'],['#/community','Communauté','community'],['#/contacts','Contacts','contacts'],['#/activity','Activité','activity'],['#/profile','Profil','profile']];
-const active = (u, h) => u === '#/' ? (h === '#/' || h.startsWith('#/m/') || /^#\/(centrale|immobilier|transport|product|ambassador)/.test(h))
+const active = (u, h) => u === '#/' ? (h === '#/' || h.startsWith('#/m/') || /^#\/(centrale|immobilier|transport|product|seller)/.test(h))
   : h === u || (u === '#/community' && (h.startsWith('#/p/') || h === '#/publish'))
   || (u === '#/activity' && h === '#/wallet') || (u === '#/profile' && h === '#/admin');
 function setNav() {
@@ -228,6 +227,7 @@ async function community() {
 
 // ===== src/pages/publish.js =====
 function publish(kind,txt){
+  let forced=false;
   app.innerHTML=`<h1>Publier</h1><form id="f" class="card"><label>Type<select id="t"><option value="offer">Je propose (offre, service)</option><option value="search">Je cherche (fournisseur, prestataire)</option></select></label>
   <label>Titre<input id="ti" required maxlength="120"></label><label>Description<textarea id="d" rows="5" required></textarea></label>
   <label>Catégorie<input id="c" placeholder="Électroménager, transport…"></label><label>Ville<input id="v" placeholder="Ouagadougou"></label>
@@ -235,6 +235,12 @@ function publish(kind,txt){
   <p class="mut">Pas d’annonce immobilière, de produit pour La Centrale ni de recherche d’emploi. Une fois validée, la publication reste visible 2 jours.</p></form>`;
   if(kind==='search')document.getElementById('t').value='search';if(txt)document.getElementById('ti').value=decodeURIComponent(txt);
   document.getElementById('f').onsubmit=async e=>{e.preventDefault();
+    if(document.getElementById('t').value==='search'&&!forced){
+      const r=await sb.rpc('search_network',{p_q:document.getElementById('ti').value.trim()}),m=(r.data||[]).filter(x=>x.kind==='product');
+      if(m.length){let box=document.getElementById('mt');if(!box){box=document.createElement('div');box.id='mt';document.getElementById('f').before(box)}
+        box.innerHTML=`<div class="card"><b>La Centrale a peut-être ce que vous cherchez</b>${m.slice(0,5).map(x=>`<a class="card" href="#/product/${x.id}"><b>${esc(x.title)}</b><br><span class="mut">${esc(x.subtitle)}</span> <b>${fcfa(x.price)}</b></a>`).join('')}
+        <p class="mut">Si aucun produit ne convient, publiez quand même : l’équipe examinera votre recherche.</p><button type="button" id="go">Publier quand même</button></div>`;
+        document.getElementById('go').onclick=()=>{forced=true;document.getElementById('f').requestSubmit()};return}}
     try{await q(sb.from(t.value==='offer'?'offers':'searches').insert({user_id:state.me.id,title:ti.value.trim(),description:d.value.trim(),category:c.value.trim()||null,city:v.value.trim()||null}));
     toast('Publication envoyée : en attente de validation.');location.hash='#/'}catch(_){}};
 }
@@ -297,14 +303,14 @@ async function wallet(){
 async function profile(){
   const p=await q(sb.from('profiles').select('*').eq('id',state.me.id).single());
   const ap=(await sb.rpc('ambassador_progress')).data?.[0]||{};
-  const ambCard=ap.active?`<a class="card" href="#/ambassador"><b>Espace ambassadeur</b><br><span class="mut">Actif jusqu’au ${dt(ap.paid_until)}</span></a>`
+  const ambCard=ap.active?`<a class="card" href="#/seller"><b>Mes commissions</b><br><span class="mut">Actif jusqu’au ${dt(ap.paid_until)}</span></a>`
    :ap.approved?`<div class="card"><b>Candidature ambassadeur acceptée</b><p class="mut">Activez votre statut pour 1 an.</p><button id="payamb">Payer 1 500 FCFA</button></div>`
    :`<div class="card"><b>Devenir ambassadeur</b><p class="mut">Conditions : inscrire 10 membres (parrainés avec votre numéro) et 3 fournisseurs avec abonnement payant. Puis abonnement de 1 500 FCFA par an.</p>
    <span class="tag">${ap.members||0}/10 membres</span><span class="tag">${ap.suppliers||0}/3 fournisseurs payants</span>${ap.eligible?'<p class="mut">Conditions remplies : contactez l’équipe DropAffy pour valider votre candidature.</p>':''}</div>`;
-  app.innerHTML=`<h1>Profil</h1><form id="f" class="card"><label>Nom complet<input id="a" value="${esc(p.full_name)}" required></label>
+  app.innerHTML=`<h1>Profil</h1><p><span class="tag">Membre</span><span class="tag">Revendeur</span><span class="tag">Apporteur d’affaires</span>${ap.active?'<span class="tag s">Ambassadeur</span>':''}</p><form id="f" class="card"><label>Nom complet<input id="a" value="${esc(p.full_name)}" required></label>
   <label>Titre professionnel<input id="b" value="${esc(p.professional_title||'')}"></label><label>Ville<input id="c" value="${esc(p.city||'')}"></label>
   <label>À propos<textarea id="d" rows="3">${esc(p.bio||'')}</textarea></label><p class="mut">Téléphone : ${esc(p.phone||'')} (non visible publiquement)</p>
-  <button class="full">Enregistrer</button></form><a class="card" href="#/wallet">Portefeuille</a>${ambCard}${state.isAdmin?'<a class="card" href="#/admin">Administration</a>':''}
+  <button class="full">Enregistrer</button></form><a class="card" href="#/wallet">Portefeuille</a><a class="card" href="#/seller"><b>Mes fiches et produits</b><br><span class="mut">Créez des fiches fournisseurs et proposez des produits à La Centrale</span></a>${ambCard}${state.isAdmin?'<a class="card" href="#/admin">Administration</a>':''}
   <button class="alt full" id="out">Se déconnecter</button>`;
   document.getElementById('f').onsubmit=async e=>{e.preventDefault();
     try{await q(sb.from('profiles').update({full_name:a.value.trim(),professional_title:b.value.trim()||null,city:c.value.trim()||null,bio:d.value.trim()||null}).eq('id',state.me.id));toast('Profil enregistré.')}catch(_){}};
@@ -319,7 +325,7 @@ async function admin(){
     sb.from('profiles').select('id,full_name,phone,account_status').order('created_at',{ascending:false}).limit(50),sb.from('admin_logs').select('*').order('created_at',{ascending:false}).limit(15),sb.from('properties').select('*').eq('status','pending'),sb.from('transport_requests').select('*').eq('status','pending')]);
   const P=[...(o.data||[]).map(x=>({...x,k:'offer'})),...(s.data||[]).map(x=>({...x,k:'search'})),...(pr.data||[]).map(x=>({...x,k:'property'})),...(tr.data||[]).map(x=>({...x,k:'transport'}))];
   app.innerHTML=`<a href="#/profile">← Profil</a><h1>Administration</h1><a class="card" href="#/admin/centrale"><b>La Centrale</b><br><span class="mut">Fournisseurs, produits et demandes des membres</span></a><h2>À valider (${P.length})</h2>
-  ${P.map(x=>`<div class="card"><span class="tag${x.k==='search'?' s':''}">${{offer:'Offre',search:'Recherche',property:'Immobilier',transport:'Transport'}[x.k]}</span><b>${esc(x.title)}</b><p class="mut">${esc(x.description)}</p>
+  ${P.map(x=>`<div class="card"><span class="tag${x.k==='search'?' s':''}">${{offer:'Offre',search:'Recherche',property:'Immobilier',transport:'Transport'}[x.k]}</span><b>${esc(x.title)}</b><p class="mut">${esc(x.description)}</p>${x.k==='search'?`<p class="mut">La Centrale : ${x.centrale_matches||0} produit(s) correspondant(s)</p>`:''}
    <button data-m="approved" data-k="${x.k}" data-i="${x.id}">Valider</button><button class="bad" data-m="rejected" data-k="${x.k}" data-i="${x.id}">Refuser</button></div>`).join('')||'<p class="card mut">Rien en attente.</p>'}
   <h2>Membres</h2>${(m.data||[]).map(x=>`<div class="card"><b>${esc(x.full_name)}</b> <span class="mut">${esc(x.phone||'')} · ${esc(x.account_status)}</span><br>
    <button class="alt" data-cr="${x.id}">Créditer</button><button class="alt" data-amb="${x.id}">Rendre ambassadeur</button><button class="alt" data-su="${x.id}" data-s="${x.account_status==='active'?'suspended':'active'}">${x.account_status==='active'?'Suspendre':'Réactiver'}</button></div>`).join('')}
@@ -351,7 +357,7 @@ async function centrale() {
   const rows = await q(sb.from('products').select('*,suppliers(display_name,certified,city)').eq('status', 'active').order('created_at', {ascending:false}).limit(80));
   rows.sort((a, b) => (b.suppliers?.certified ? 1 : 0) - (a.suppliers?.certified ? 1 : 0));   // fournisseurs certifiés en premier
   const cats = [...new Set(rows.map(r => r.category).filter(Boolean))], list = rows.filter(r => !cat || r.category === cat);
-  app.innerHTML = `<a href="#/">← Retour</a><div class="row"><h1>La Centrale</h1>${state.isAdmin || state.isAmbassador ? `<a class="btn" href="${state.isAdmin ? '#/admin/centrale' : '#/ambassador'}">Publier un produit</a>` : ''}</div>
+  app.innerHTML = `<a href="#/">← Retour</a><div class="row"><h1>La Centrale</h1><a class="btn" href="#/seller">Publier un produit</a></div>
   <div><button class="${cat ? 'alt' : ''}" data-c="">Tout</button>${cats.map(c => `<button class="${cat === c ? '' : 'alt'}" data-c="${esc(c)}">${esc(c)}</button>`).join('')}</div>
   ${list.map(r => `<a class="card" href="#/product/${r.id}"><b>${esc(r.title)}</b><br>
    ${r.suppliers?.certified ? '<span class="tag">Certifié</span>' : ''}<span class="tag s">${esc(AV[r.availability])}</span><span class="mut">${esc(r.suppliers?.display_name || '')}</span>
@@ -485,16 +491,18 @@ async function adminCentrale() {
 // ===== src/pages/ambassador.js =====
 const AVL = {in_stock:'En stock', limited:'Stock limité', out_of_stock:'Rupture', unconfirmed:'À confirmer'};
 const PST = {pending:'En attente de validation', active:'Publié', rejected:'Refusé', inactive:'Retiré', draft:'Brouillon'};
-async function ambassador() {
-  if (!state.isAmbassador) { app.innerHTML = '<a href="#/profile">← Profil</a><p class="card">Espace réservé aux ambassadeurs actifs.</p>'; return; }
-  const [sp, pr, ld] = await Promise.all([sb.from('suppliers').select('*').eq('created_by', state.me.id).order('created_at', {ascending:false}),
+async function seller() {
+  const [sp, pr, ld, cm] = await Promise.all([sb.from('suppliers').select('*').eq('created_by', state.me.id).order('created_at', {ascending:false}),
     sb.from('products').select('*,suppliers(display_name)').eq('created_by', state.me.id).order('created_at', {ascending:false}),
-    sb.from('product_leads').select('*,products(title)').eq('ambassador_id', state.me.id).order('created_at', {ascending:false}).limit(60)]);
-  const S = sp.data || [], P = pr.data || [], L = ld.data || [];
-  app.innerHTML = `<a href="#/centrale">← La Centrale</a><h1>Espace ambassadeur</h1>
+    sb.from('product_leads').select('*,products(title)').eq('ambassador_id', state.me.id).order('created_at', {ascending:false}).limit(60),
+    sb.from('commission_ledger').select('*').order('created_at', {ascending:false}).limit(50)]);
+  const S = sp.data || [], P = pr.data || [], L = ld.data || [], C = cm.data || [];
+  app.innerHTML = `<a href="#/centrale">← La Centrale</a><h1>Mes fiches et produits</h1>
+  <p class="mut">Tout membre peut créer des fiches fournisseurs et proposer des produits. Un produit est visible après validation par l’administration.</p>
   <h2>Demandes reçues (${L.filter(x => x.status === 'new').length} à traiter)</h2>
   ${L.map(x => `<div class="card" data-l="${x.id}"><b>${esc(x.products?.title)}</b> <span class="tag">${{contact:'Contact', buy:'Achat', promote:'Promotion'}[x.kind]}</span><span class="tag s">${{new:'En attente', validated:'Validée', refused:'Refusée'}[x.status]}</span>
    <p class="mut who">…</p><p>${esc(x.message || '')}</p>${x.status === 'new' ? `<button data-d="validated" data-i="${x.id}">Valider</button><button class="bad" data-d="refused" data-i="${x.id}">Refuser</button>` : ''}</div>`).join('') || '<p class="card mut">Aucune demande.</p>'}
+  ${state.isAmbassador ? `<h2>Mes commissions</h2>${C.map(c => `<div class="card row"><span class="mut">${dt(c.created_at)} · 40 % de ${fcfa(c.base_amount)}</span><b>${fcfa(c.amount)}</b></div>`).join('') || '<p class="card mut">Aucune commission pour le moment.</p>'}<p class="mut">Les retraits ouvriront quand leurs règles seront définies.</p>` : ''}
   <h2>Mes fiches fournisseurs</h2>${S.map(s => `<div class="card">${esc(s.display_name)} <span class="mut">${esc(s.category || '')} ${esc(s.city || '')}</span></div>`).join('') || '<p class="card mut">Aucune fiche.</p>'}
   <form id="sf" class="card"><b>Nouvelle fiche fournisseur</b><label>Nom affiché (public, unique)<input name="display_name" required></label><label>Nom réel (privé)<input name="real_name"></label>
   <label>Téléphone (privé)<input name="phone" type="tel"></label><label>WhatsApp (privé)<input name="whatsapp" type="tel"></label><label>Catégorie<input name="category"></label><label>Ville<input name="city"></label>
@@ -507,7 +515,7 @@ async function ambassador() {
   <label>Prix (FCFA)<input name="price" type="number" min="0" required></label><label>Commission annoncée (FCFA)<input name="commission" type="number" min="0"></label>
   <label>Disponibilité<select name="availability"><option value="unconfirmed">À confirmer</option><option value="in_stock">En stock</option><option value="limited">Stock limité</option><option value="out_of_stock">Rupture</option></select></label>
   <button class="full">Envoyer pour validation</button><p class="mut">Le produit sera visible après validation par l’administration.</p></form>`;
-  const go = async f => { try { await f(); ambassador(); } catch (_) {} };
+  const go = async f => { try { await f(); seller(); } catch (_) {} };
   L.forEach(async x => { const w = await sb.rpc('lead_requester', {p_lead_id:x.id}), d = w.data?.[0], el = app.querySelector(`[data-l="${x.id}"] .who`);
     if (el) el.textContent = d ? `${d.full_name} · ${d.phone || ''} · ${d.city || ''}` : ''; });
   app.querySelectorAll('[data-d]').forEach(b => b.onclick = () => { let note = null;
@@ -525,7 +533,7 @@ async function ambassador() {
 }
 
 // ===== src/main.js =====
-const ROUTES = {'':home, community, publish, contacts, activity, wallet, profile, admin:a => a === 'centrale' ? adminCentrale() : admin(), p:detail, m:soon, centrale, product, immobilier, transport, ambassador};
+const ROUTES = {'':home, community, publish, contacts, activity, wallet, profile, admin:a => a === 'centrale' ? adminCentrale() : admin(), p:detail, m:soon, centrale, product, immobilier, transport, seller};
 
 async function route() {
   if (!state.me) return authView(boot);
