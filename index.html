@@ -78,7 +78,7 @@ const MODULES = [
 const STATUS = {pending:'En attente', approved:'Publiée', rejected:'Refusée', expired:'Expirée', fulfilled:'Satisfaite'};
 
 // ===== src/contexts/state.js =====
-const state = {me:null, isAdmin:false, feedTab:'offer'};
+const state = {me:null, isAdmin:false, isAmbassador:false, feedTab:'offer'};
 
 // ===== src/utils/format.js =====
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -108,7 +108,7 @@ const P = {
   spark:'<path d="M12 3l2 5 5 2-5 2-2 5-2-5-5-2 5-2z"/>'};
 const icon = n => `<svg viewBox="0 0 24 24" aria-hidden="true">${P[n] || ''}</svg>`;
 const TABS = [['#/','Accueil','home'],['#/community','Communauté','community'],['#/contacts','Contacts','contacts'],['#/activity','Activité','activity'],['#/profile','Profil','profile']];
-const active = (u, h) => u === '#/' ? (h === '#/' || h.startsWith('#/m/') || /^#\/(centrale|immobilier|transport|product)/.test(h))
+const active = (u, h) => u === '#/' ? (h === '#/' || h.startsWith('#/m/') || /^#\/(centrale|immobilier|transport|product|ambassador)/.test(h))
   : h === u || (u === '#/community' && (h.startsWith('#/p/') || h === '#/publish'))
   || (u === '#/activity' && h === '#/wallet') || (u === '#/profile' && h === '#/admin');
 function setNav() {
@@ -138,9 +138,9 @@ async function q(p) {
 // ===== src/services/auth.js =====
 // L'état admin vient du serveur (is_admin), pas du navigateur.
 async function loadSession() {
-  const {data} = await sb.auth.getSession(); const user = data.session?.user || null; let admin = false;
-  if (user) { const r = await sb.rpc('is_admin'); admin = r.data === true; }
-  return {user, admin};
+  const {data} = await sb.auth.getSession(); const user = data.session?.user || null; let admin = false, amb = false;
+  if (user) { const r = await sb.rpc('is_admin'); admin = r.data === true; const a = await sb.rpc('is_ambassador'); amb = a.data === true; }
+  return {user, admin, amb};
 }
 
 // ===== src/pages/auth.js =====
@@ -150,13 +150,14 @@ function authView(onDone,mode='login'){
   <form id="f" class="card">${reg?'<label>Nom complet<input id="n" required autocomplete="name"></label>':''}
   <label>Numéro de téléphone<input id="p" type="tel" required autocomplete="tel" placeholder="70 12 34 56"></label>
   <label>Mot de passe<input id="w" type="password" required minlength="8" autocomplete="${reg?'new-password':'current-password'}"></label>
+  ${reg?'<label>Numéro du parrain (facultatif)<input id="ref" type="tel" placeholder="Numéro de la personne qui vous a invité"></label>':''}
   <button class="full">${reg?'Créer mon compte':'Se connecter'}</button></form>
   <button class="alt full" id="sw">${reg?'J’ai déjà un compte':'Créer un compte'}</button></div>`;
   document.getElementById('sw').onclick=()=>authView(onDone,reg?'login':'register');
   document.getElementById('f').onsubmit=async e=>{e.preventDefault();
     const d=norm(p.value),email=mail(d);
     try{
-      if(reg){await q(sb.auth.signUp({email,password:w.value,options:{data:{full_name:n.value.trim(),phone:'+'+d}}}))}
+      if(reg){await q(sb.auth.signUp({email,password:w.value,options:{data:{full_name:n.value.trim(),phone:'+'+d}}}));const rf=document.getElementById('ref');if(rf&&rf.value.trim())await sb.rpc('set_referrer',{p_phone:rf.value})}
       else await q(sb.auth.signInWithPassword({email,password:w.value}));
       onDone();
     }catch(_){}};
@@ -295,14 +296,21 @@ async function wallet(){
 // ===== src/pages/profile.js =====
 async function profile(){
   const p=await q(sb.from('profiles').select('*').eq('id',state.me.id).single());
+  const ap=(await sb.rpc('ambassador_progress')).data?.[0]||{};
+  const ambCard=ap.active?`<a class="card" href="#/ambassador"><b>Espace ambassadeur</b><br><span class="mut">Actif jusqu’au ${dt(ap.paid_until)}</span></a>`
+   :ap.approved?`<div class="card"><b>Candidature ambassadeur acceptée</b><p class="mut">Activez votre statut pour 1 an.</p><button id="payamb">Payer 1 500 FCFA</button></div>`
+   :`<div class="card"><b>Devenir ambassadeur</b><p class="mut">Conditions : inscrire 10 membres (parrainés avec votre numéro) et 3 fournisseurs avec abonnement payant. Puis abonnement de 1 500 FCFA par an.</p>
+   <span class="tag">${ap.members||0}/10 membres</span><span class="tag">${ap.suppliers||0}/3 fournisseurs payants</span>${ap.eligible?'<p class="mut">Conditions remplies : contactez l’équipe DropAffy pour valider votre candidature.</p>':''}</div>`;
   app.innerHTML=`<h1>Profil</h1><form id="f" class="card"><label>Nom complet<input id="a" value="${esc(p.full_name)}" required></label>
   <label>Titre professionnel<input id="b" value="${esc(p.professional_title||'')}"></label><label>Ville<input id="c" value="${esc(p.city||'')}"></label>
   <label>À propos<textarea id="d" rows="3">${esc(p.bio||'')}</textarea></label><p class="mut">Téléphone : ${esc(p.phone||'')} (non visible publiquement)</p>
-  <button class="full">Enregistrer</button></form><a class="card" href="#/wallet">Portefeuille</a>${state.isAdmin?'<a class="card" href="#/admin">Administration</a>':''}
+  <button class="full">Enregistrer</button></form><a class="card" href="#/wallet">Portefeuille</a>${ambCard}${state.isAdmin?'<a class="card" href="#/admin">Administration</a>':''}
   <button class="alt full" id="out">Se déconnecter</button>`;
   document.getElementById('f').onsubmit=async e=>{e.preventDefault();
     try{await q(sb.from('profiles').update({full_name:a.value.trim(),professional_title:b.value.trim()||null,city:c.value.trim()||null,bio:d.value.trim()||null}).eq('id',state.me.id));toast('Profil enregistré.')}catch(_){}};
   document.getElementById('out').onclick=async()=>{await sb.auth.signOut()};
+  const pa=document.getElementById('payamb');if(pa)pa.onclick=async()=>{if(!confirm('Débiter 1 500 FCFA de votre portefeuille pour 1 an d’abonnement ambassadeur ?'))return;
+    try{await q(sb.rpc('pay_ambassador_fee'));state.isAmbassador=true;toast('Statut ambassadeur activé.');profile()}catch(_){}};
 }
 
 // ===== src/pages/admin.js =====
@@ -314,13 +322,16 @@ async function admin(){
   ${P.map(x=>`<div class="card"><span class="tag${x.k==='search'?' s':''}">${{offer:'Offre',search:'Recherche',property:'Immobilier',transport:'Transport'}[x.k]}</span><b>${esc(x.title)}</b><p class="mut">${esc(x.description)}</p>
    <button data-m="approved" data-k="${x.k}" data-i="${x.id}">Valider</button><button class="bad" data-m="rejected" data-k="${x.k}" data-i="${x.id}">Refuser</button></div>`).join('')||'<p class="card mut">Rien en attente.</p>'}
   <h2>Membres</h2>${(m.data||[]).map(x=>`<div class="card"><b>${esc(x.full_name)}</b> <span class="mut">${esc(x.phone||'')} · ${esc(x.account_status)}</span><br>
-   <button class="alt" data-cr="${x.id}">Créditer</button><button class="alt" data-su="${x.id}" data-s="${x.account_status==='active'?'suspended':'active'}">${x.account_status==='active'?'Suspendre':'Réactiver'}</button></div>`).join('')}
+   <button class="alt" data-cr="${x.id}">Créditer</button><button class="alt" data-amb="${x.id}">Rendre ambassadeur</button><button class="alt" data-su="${x.id}" data-s="${x.account_status==='active'?'suspended':'active'}">${x.account_status==='active'?'Suspendre':'Réactiver'}</button></div>`).join('')}
   <h2>Journal</h2>${(l.data||[]).map(x=>`<div class="card mut">${dt(x.created_at)} · ${esc(x.action)}</div>`).join('')}`;
   app.querySelectorAll('[data-m]').forEach(b=>b.onclick=async()=>{let why=null;
     if(b.dataset.m==='rejected'){why=prompt('Motif du refus ?');if(!why)return}
     try{await q(sb.rpc('admin_moderate_publication',{p_type:b.dataset.k,p_id:b.dataset.i,p_decision:b.dataset.m,p_reason:why}));admin()}catch(_){}});
   app.querySelectorAll('[data-cr]').forEach(b=>b.onclick=async()=>{const a=parseInt(prompt('Montant en FCFA ?'),10),ref=prompt('Référence du paiement reçu ?');if(!a||!ref)return;
     try{await q(sb.rpc('admin_credit_wallet',{p_user_id:b.dataset.cr,p_amount:a,p_reference:ref}));toast('Portefeuille crédité.');admin()}catch(_){}});
+  app.querySelectorAll('[data-amb]').forEach(b=>b.onclick=async()=>{const g=(await sb.rpc('ambassador_progress',{p_user:b.dataset.amb})).data?.[0]||{};
+    if(!confirm('Membres parrainés : '+(g.members||0)+'/10 · Fournisseurs payants : '+(g.suppliers||0)+'/3. Accepter la candidature ?'))return;
+    try{await q(sb.rpc('admin_approve_ambassador',{p_user_id:b.dataset.amb}));toast('Candidature acceptée : le membre doit payer 1 500 FCFA pour activer son statut.')}catch(_){}});
   app.querySelectorAll('[data-su]').forEach(b=>b.onclick=async()=>{const why=prompt('Motif ?');if(!why)return;
     try{await q(sb.rpc('admin_set_account_status',{p_user_id:b.dataset.su,p_new_status:b.dataset.s,p_reason:why}));admin()}catch(_){}});
 }
@@ -340,25 +351,36 @@ async function centrale() {
   const rows = await q(sb.from('products').select('*,suppliers(display_name,certified,city)').eq('status', 'active').order('created_at', {ascending:false}).limit(80));
   rows.sort((a, b) => (b.suppliers?.certified ? 1 : 0) - (a.suppliers?.certified ? 1 : 0));   // fournisseurs certifiés en premier
   const cats = [...new Set(rows.map(r => r.category).filter(Boolean))], list = rows.filter(r => !cat || r.category === cat);
-  app.innerHTML = `<a href="#/">← Retour</a><h1>La Centrale</h1>
+  app.innerHTML = `<a href="#/">← Retour</a><div class="row"><h1>La Centrale</h1>${state.isAdmin || state.isAmbassador ? `<a class="btn" href="${state.isAdmin ? '#/admin/centrale' : '#/ambassador'}">Publier un produit</a>` : ''}</div>
   <div><button class="${cat ? 'alt' : ''}" data-c="">Tout</button>${cats.map(c => `<button class="${cat === c ? '' : 'alt'}" data-c="${esc(c)}">${esc(c)}</button>`).join('')}</div>
   ${list.map(r => `<a class="card" href="#/product/${r.id}"><b>${esc(r.title)}</b><br>
    ${r.suppliers?.certified ? '<span class="tag">Certifié</span>' : ''}<span class="tag s">${esc(AV[r.availability])}</span><span class="mut">${esc(r.suppliers?.display_name || '')}</span>
    <div class="row" style="margin-top:8px"><b>${fcfa(r.price)}</b>${r.commission != null ? `<span class="mut">Commission annoncée : ${fcfa(r.commission)}</span>` : ''}</div></a>`).join('') || '<p class="card mut">Le catalogue est en cours de constitution.</p>'}`;
   app.querySelectorAll('[data-c]').forEach(b => b.onclick = () => { cat = b.dataset.c; centrale(); });
 }
+const LK = {contact:'Contact', buy:'Achat', promote:'Promotion'}, LS = {new:'En attente', validated:'Validée', refused:'Refusée'};
 async function product(id) {
   const r = await q(sb.from('products').select('*,suppliers(display_name,certified,city)').eq('id', id).single());
   app.innerHTML = `<a href="#/centrale">← La Centrale</a><h1>${esc(r.title)}</h1>
   <p>${r.suppliers?.certified ? '<span class="tag">Fournisseur certifié</span>' : ''}<span class="tag s">${esc(AV[r.availability])}</span><span class="tag">${esc(r.category || 'Général')}</span></p>
   <div class="card"><b style="font-size:1.4rem">${fcfa(r.price)}</b>${r.commission != null ? `<br><span class="mut">Commission annoncée : ${fcfa(r.commission)}</span>` : ''}
   <p>${esc(r.description).replace(/\n/g, '<br>')}</p><p class="mut">Fournisseur : ${esc(r.suppliers?.display_name || '')} ${esc(r.suppliers?.city || '')}</p></div>
-  <div class="card"><label>Message (facultatif)<textarea id="lm" rows="2"></textarea></label>
-  <button data-k="buy">Je suis intéressé</button><button class="alt" data-k="promote">Je veux le promouvoir</button>
-  <p class="mut">L’équipe DropAffy traite votre demande. Les coordonnées du fournisseur restent protégées.</p></div>`;
+  ${r.created_by === state.me.id ? '<p class="card">Ceci est votre produit.</p>' : `<div class="card"><label>Message (facultatif)<textarea id="lm" rows="2"></textarea></label>
+  <button data-k="contact">Contacter</button><button data-k="buy">Acheter</button><button class="alt" data-k="promote">Promouvoir</button>
+  <p class="mut">L’ambassadeur qui a publié ce produit examine votre demande. Une fois validée, les coordonnées du fournisseur s’affichent ici.</p></div>`}
+  <div id="leads"></div>`;
+  const leads = async () => {
+    const L = (await q(sb.from('product_leads').select('*').eq('product_id', id).eq('user_id', state.me.id).order('created_at', {ascending:false}))) || [];
+    const parts = await Promise.all(L.map(async l => { let c = '';
+      if (l.status === 'validated') { const x = await sb.rpc('get_supplier_contact', {p_lead_id:l.id}), d = x.data?.[0];
+        if (d?.phone) c = `<a class="btn" href="tel:${esc(d.phone)}">Appeler</a><a class="btn" href="https://wa.me/${esc(String(d.whatsapp || d.phone).replace(/\D/g, ''))}">WhatsApp</a>`; }
+      return `<div class="card"><span class="tag">${LK[l.kind]}</span><span class="tag s">${LS[l.status]}</span>${l.status === 'refused' && l.decision_note ? `<p class="mut">${esc(l.decision_note)}</p>` : ''}<div>${c}</div></div>`; }));
+    document.getElementById('leads').innerHTML = L.length ? '<h2>Mes demandes</h2>' + parts.join('') : '';
+  };
   app.querySelectorAll('[data-k]').forEach(b => b.onclick = async () => {
     const x = await sb.from('product_leads').insert({user_id:state.me.id, product_id:id, kind:b.dataset.k, message:document.getElementById('lm').value.trim() || null});
-    toast(x.error ? (x.error.code === '23505' ? 'Vous avez déjà envoyé cette demande.' : x.error.message) : 'Demande envoyée. L’équipe vous contactera.'); });
+    toast(x.error ? (x.error.code === '23505' ? 'Vous avez déjà envoyé cette demande.' : x.error.message) : 'Demande envoyée à l’ambassadeur.'); await leads(); });
+  await leads();
 }
 
 // ===== src/pages/immobilier.js =====
@@ -414,18 +436,27 @@ function formTr() {
 
 // ===== src/pages/adminCentrale.js =====
 async function adminCentrale() {
-  const [sp, pr, ld] = await Promise.all([sb.from('suppliers').select('*').order('created_at', {ascending:false}),
+  const [sp, pr, ld, am, mb] = await Promise.all([sb.from('suppliers').select('*').order('created_at', {ascending:false}),
     sb.from('products').select('*,suppliers(display_name)').order('created_at', {ascending:false}).limit(60),
-    sb.from('product_leads').select('*,products(title),profiles(full_name,phone)').order('created_at', {ascending:false}).limit(60)]);
-  const S = sp.data || [], P = pr.data || [], L = ld.data || [];
+    sb.from('product_leads').select('*,products(title),profiles!product_leads_user_id_fkey(full_name,phone)').order('created_at', {ascending:false}).limit(60),
+    sb.from('ambassadors').select('*,profiles!ambassadors_user_id_fkey(full_name,phone)'), sb.from('profiles').select('id,full_name,phone').order('created_at', {ascending:false}).limit(200)]);
+  const S = sp.data || [], P = pr.data || [], L = ld.data || [], A = am.data || [], M = mb.data || [], PEND = P.filter(x => x.status === 'pending');
   app.innerHTML = `<a href="#/admin">← Administration</a><h1>La Centrale</h1>
+  <h2>Produits à valider (${PEND.length})</h2>${PEND.map(x => `<div class="card"><b>${esc(x.title)}</b> <span class="mut">${esc(x.suppliers?.display_name)} · ${fcfa(x.price)}</span><p class="mut">${esc(x.description)}</p>
+   <button data-r="active" data-i="${x.id}">Valider</button><button class="bad" data-r="rejected" data-i="${x.id}">Refuser</button></div>`).join('') || '<p class="card mut">Aucun produit en attente.</p>'}
+  <h2>Ambassadeurs (${A.length})</h2>${A.map(x => `<div class="card row"><span><b>${esc(x.profiles?.full_name)}</b><br><span class="mut">${x.paid_until && new Date(x.paid_until) > new Date() ? 'Actif jusqu’au ' + dt(x.paid_until) : 'Abonnement à payer ou expiré'}</span></span>
+   <button class="bad" data-rv="${x.user_id}">Révoquer</button></div>`).join('') || '<p class="card mut">Aucun ambassadeur.</p>'}
+  <form id="bf" class="card"><b>Abonnement fournisseur payé</b><label>Fournisseur<select name="supplier_id" required>${S.map(s => `<option value="${s.id}">${esc(s.display_name)}</option>`).join('')}</select></label>
+  <label>Montant (FCFA)<input name="amount" type="number" min="1" required></label><label>Référence du paiement<input name="reference" required></label><button class="full">Enregistrer l’abonnement (1 an)</button></form>
   <h2>Demandes des membres (${L.filter(x => x.status === 'new').length} nouvelles)</h2>
-  ${L.map(x => `<div class="card"><b>${esc(x.products?.title)}</b> <span class="tag">${x.kind === 'buy' ? 'Achat' : 'Promotion'}</span><span class="tag s">${esc(x.status)}</span><br>
+  ${L.map(x => `<div class="card"><b>${esc(x.products?.title)}</b> <span class="tag">${{contact:'Contact', buy:'Achat', promote:'Promotion'}[x.kind]}</span><span class="tag s">${esc(x.status)}</span><br>
    <span class="mut">${esc(x.profiles?.full_name)} · ${esc(x.profiles?.phone)}</span><p>${esc(x.message || '')}</p>
-   ${x.status === 'new' ? `<button data-h="${x.id}">Marquer traitée</button>` : ''}</div>`).join('') || '<p class="card mut">Aucune demande.</p>'}
+   ${x.status === 'new' ? `<button data-d="validated" data-i="${x.id}">Valider</button><button class="bad" data-d="refused" data-i="${x.id}">Refuser</button>` : ''}</div>`).join('') || '<p class="card mut">Aucune demande.</p>'}
   <h2>Nouveau fournisseur</h2><form id="sf" class="card"><label>Nom affiché (public)<input name="display_name" required></label>
   <label>Nom réel (privé)<input name="real_name"></label><label>Téléphone (privé)<input name="phone"></label>
   <label>Catégorie<input name="category"></label><label>Ville<input name="city"></label>
+  <label>Recruté par (ambassadeur ou candidat)<select name="referred_by"><option value="">—</option>${M.map(m => `<option value="${m.id}">${esc(m.full_name)} ${esc(m.phone || '')}</option>`).join('')}</select></label>
+  <label>WhatsApp (privé)<input name="whatsapp"></label>
   <label><input name="certified" type="checkbox" style="width:auto"> Fournisseur certifié</label><button class="full">Créer le fournisseur</button></form>
   <h2>Nouveau produit</h2><form id="pf" class="card"><label>Fournisseur<select name="supplier_id" required>${S.map(s => `<option value="${s.id}">${esc(s.display_name)}</option>`).join('')}</select></label>
   <label>Titre<input name="title" required></label><label>Description<textarea name="description" rows="3"></textarea></label><label>Catégorie<input name="category"></label>
@@ -436,17 +467,65 @@ async function adminCentrale() {
    <button class="alt" data-p="${x.id}" data-s="${x.status === 'active' ? 'inactive' : 'active'}">${x.status === 'active' ? 'Retirer' : 'Publier'}</button></div>`).join('')}`;
   const go = async f => { try { await f(); adminCentrale(); } catch (_) {} };
   document.getElementById('sf').onsubmit = e => { e.preventDefault(); const f = Object.fromEntries(new FormData(e.target)); go(async () => {
-    const s = await q(sb.from('suppliers').insert({display_name:f.display_name.trim(), category:f.category.trim() || null, city:f.city.trim() || null, certified:f.certified === 'on'}).select('id').single());
-    if (f.real_name || f.phone) await q(sb.from('supplier_private').insert({supplier_id:s.id, real_name:f.real_name.trim() || null, phone:f.phone.trim() || null})); toast('Fournisseur créé.'); }); };
+    const s = await q(sb.from('suppliers').insert({display_name:f.display_name.trim(), category:f.category.trim() || null, city:f.city.trim() || null, certified:f.certified === 'on', referred_by:f.referred_by || null}).select('id').single());
+    if (f.real_name || f.phone || f.whatsapp) await q(sb.from('supplier_private').insert({supplier_id:s.id, real_name:f.real_name.trim() || null, phone:f.phone.trim() || null, whatsapp:f.whatsapp.trim() || null})); toast('Fournisseur créé.'); }); };
   document.getElementById('pf').onsubmit = e => { e.preventDefault(); const f = Object.fromEntries(new FormData(e.target)); go(async () => {
     await q(sb.from('products').insert({supplier_id:f.supplier_id, title:f.title.trim(), description:f.description.trim(), category:f.category.trim() || null, price:Number(f.price),
       commission:f.commission === '' ? null : Number(f.commission), availability:f.availability, status:f.status})); toast('Produit créé.'); }); };
-  app.querySelectorAll('[data-h]').forEach(b => b.onclick = () => go(() => q(sb.from('product_leads').update({status:'handled'}).eq('id', b.dataset.h))));
+  app.querySelectorAll('[data-d]').forEach(b => b.onclick = () => { let note = null; if (b.dataset.d === 'refused') { note = prompt('Motif du refus (facultatif) ?'); if (note === null) return; }
+    go(() => q(sb.rpc('decide_lead', {p_lead_id:b.dataset.i, p_decision:b.dataset.d, p_note:note}))); });
+  app.querySelectorAll('[data-r]').forEach(b => b.onclick = () => { let why = null; if (b.dataset.r === 'rejected') { why = prompt('Motif du refus ?'); if (!why) return; }
+    go(() => q(sb.rpc('admin_review_product', {p_id:b.dataset.i, p_decision:b.dataset.r, p_reason:why}))); });
+  app.querySelectorAll('[data-rv]').forEach(b => b.onclick = () => { if (confirm('Révoquer ce statut d’ambassadeur ?')) go(() => q(sb.rpc('admin_revoke_ambassador', {p_user_id:b.dataset.rv}))); });
+  document.getElementById('bf').onsubmit = e => { e.preventDefault(); const f = Object.fromEntries(new FormData(e.target));
+    go(async () => { await q(sb.from('supplier_subscriptions').insert({supplier_id:f.supplier_id, amount:Number(f.amount), reference:f.reference.trim()})); toast('Abonnement enregistré.'); }); };
   app.querySelectorAll('[data-p]').forEach(b => b.onclick = () => go(() => q(sb.from('products').update({status:b.dataset.s}).eq('id', b.dataset.p))));
 }
 
+// ===== src/pages/ambassador.js =====
+const AVL = {in_stock:'En stock', limited:'Stock limité', out_of_stock:'Rupture', unconfirmed:'À confirmer'};
+const PST = {pending:'En attente de validation', active:'Publié', rejected:'Refusé', inactive:'Retiré', draft:'Brouillon'};
+async function ambassador() {
+  if (!state.isAmbassador) { app.innerHTML = '<a href="#/profile">← Profil</a><p class="card">Espace réservé aux ambassadeurs actifs.</p>'; return; }
+  const [sp, pr, ld] = await Promise.all([sb.from('suppliers').select('*').eq('created_by', state.me.id).order('created_at', {ascending:false}),
+    sb.from('products').select('*,suppliers(display_name)').eq('created_by', state.me.id).order('created_at', {ascending:false}),
+    sb.from('product_leads').select('*,products(title)').eq('ambassador_id', state.me.id).order('created_at', {ascending:false}).limit(60)]);
+  const S = sp.data || [], P = pr.data || [], L = ld.data || [];
+  app.innerHTML = `<a href="#/centrale">← La Centrale</a><h1>Espace ambassadeur</h1>
+  <h2>Demandes reçues (${L.filter(x => x.status === 'new').length} à traiter)</h2>
+  ${L.map(x => `<div class="card" data-l="${x.id}"><b>${esc(x.products?.title)}</b> <span class="tag">${{contact:'Contact', buy:'Achat', promote:'Promotion'}[x.kind]}</span><span class="tag s">${{new:'En attente', validated:'Validée', refused:'Refusée'}[x.status]}</span>
+   <p class="mut who">…</p><p>${esc(x.message || '')}</p>${x.status === 'new' ? `<button data-d="validated" data-i="${x.id}">Valider</button><button class="bad" data-d="refused" data-i="${x.id}">Refuser</button>` : ''}</div>`).join('') || '<p class="card mut">Aucune demande.</p>'}
+  <h2>Mes fiches fournisseurs</h2>${S.map(s => `<div class="card">${esc(s.display_name)} <span class="mut">${esc(s.category || '')} ${esc(s.city || '')}</span></div>`).join('') || '<p class="card mut">Aucune fiche.</p>'}
+  <form id="sf" class="card"><b>Nouvelle fiche fournisseur</b><label>Nom affiché (public, unique)<input name="display_name" required></label><label>Nom réel (privé)<input name="real_name"></label>
+  <label>Téléphone (privé)<input name="phone" type="tel"></label><label>WhatsApp (privé)<input name="whatsapp" type="tel"></label><label>Catégorie<input name="category"></label><label>Ville<input name="city"></label>
+  <button class="full">Créer la fiche</button></form>
+  <h2>Mes produits</h2>${P.map(x => `<div class="card"><b>${esc(x.title)}</b> <span class="tag s">${PST[x.status]}</span><br><span class="mut">${esc(x.suppliers?.display_name)} · ${fcfa(x.price)}</span>
+   ${x.status === 'rejected' && x.review_note ? `<p class="mut">Motif : ${esc(x.review_note)}</p>` : ''}
+   ${x.status === 'active' ? `<select data-a="${x.id}">${Object.entries(AVL).map(([v, l]) => `<option value="${v}" ${x.availability === v ? 'selected' : ''}>${l}</option>`).join('')}</select>` : ''}</div>`).join('') || '<p class="card mut">Aucun produit.</p>'}
+  <form id="pf" class="card"><b>Publier un produit</b><label>Fournisseur<select name="supplier_id" required>${S.map(s => `<option value="${s.id}">${esc(s.display_name)}</option>`).join('')}</select></label>
+  <label>Titre<input name="title" required></label><label>Description<textarea name="description" rows="3"></textarea></label><label>Catégorie<input name="category"></label>
+  <label>Prix (FCFA)<input name="price" type="number" min="0" required></label><label>Commission annoncée (FCFA)<input name="commission" type="number" min="0"></label>
+  <label>Disponibilité<select name="availability"><option value="unconfirmed">À confirmer</option><option value="in_stock">En stock</option><option value="limited">Stock limité</option><option value="out_of_stock">Rupture</option></select></label>
+  <button class="full">Envoyer pour validation</button><p class="mut">Le produit sera visible après validation par l’administration.</p></form>`;
+  const go = async f => { try { await f(); ambassador(); } catch (_) {} };
+  L.forEach(async x => { const w = await sb.rpc('lead_requester', {p_lead_id:x.id}), d = w.data?.[0], el = app.querySelector(`[data-l="${x.id}"] .who`);
+    if (el) el.textContent = d ? `${d.full_name} · ${d.phone || ''} · ${d.city || ''}` : ''; });
+  app.querySelectorAll('[data-d]').forEach(b => b.onclick = () => { let note = null;
+    if (b.dataset.d === 'refused') { note = prompt('Motif du refus (facultatif) ?'); if (note === null) return; }
+    go(() => q(sb.rpc('decide_lead', {p_lead_id:b.dataset.i, p_decision:b.dataset.d, p_note:note}))); });
+  app.querySelectorAll('[data-a]').forEach(s => s.onchange = () => go(() => q(sb.rpc('ambassador_set_availability', {p_product_id:s.dataset.a, p_availability:s.value}))));
+  document.getElementById('sf').onsubmit = e => { e.preventDefault(); const f = Object.fromEntries(new FormData(e.target));
+    go(async () => { const x = await sb.from('suppliers').insert({display_name:f.display_name.trim(), category:f.category.trim() || null, city:f.city.trim() || null}).select('id').single();
+      if (x.error) { toast(x.error.code === '23505' ? 'Ce nom de fiche existe déjà : choisissez-en un autre.' : x.error.message); throw x.error; }
+      if (f.real_name || f.phone || f.whatsapp) await q(sb.from('supplier_private').insert({supplier_id:x.data.id, real_name:f.real_name.trim() || null, phone:f.phone.trim() || null, whatsapp:f.whatsapp.trim() || null}));
+      toast('Fiche créée.'); }); };
+  document.getElementById('pf').onsubmit = e => { e.preventDefault(); const f = Object.fromEntries(new FormData(e.target));
+    go(async () => { await q(sb.from('products').insert({supplier_id:f.supplier_id, title:f.title.trim(), description:f.description.trim(), category:f.category.trim() || null,
+      price:Number(f.price), commission:f.commission === '' ? null : Number(f.commission), availability:f.availability, status:'pending'})); toast('Produit envoyé pour validation.'); }); };
+}
+
 // ===== src/main.js =====
-const ROUTES = {'':home, community, publish, contacts, activity, wallet, profile, admin:a => a === 'centrale' ? adminCentrale() : admin(), p:detail, m:soon, centrale, product, immobilier, transport};
+const ROUTES = {'':home, community, publish, contacts, activity, wallet, profile, admin:a => a === 'centrale' ? adminCentrale() : admin(), p:detail, m:soon, centrale, product, immobilier, transport, ambassador};
 
 async function route() {
   if (!state.me) return authView(boot);
@@ -459,7 +538,7 @@ async function route() {
   try { await fn(a, b); }
   catch (_) { app.innerHTML = '<p class="card">Impossible de charger cet écran. Vérifiez votre connexion puis réessayez.</p>'; }
 }
-async function boot() { const s = await loadSession(); state.me = s.user; state.isAdmin = s.admin; route(); }
+async function boot() { const s = await loadSession(); state.me = s.user; state.isAdmin = s.admin; state.isAmbassador = s.amb; route(); }
 
 window.addEventListener('hashchange', route);
 sb.auth.onAuthStateChange(ev => { if (ev === 'SIGNED_OUT') { state.me = null; state.isAdmin = false; route(); } });
