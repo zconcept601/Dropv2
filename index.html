@@ -69,9 +69,9 @@ const SUPABASE_KEY = 'sb_publishable_IPsMYGWKaOGMxLO6I6z_Ng_KqOEOBxj';
 // Modules : seul le statut 'ready' ouvre un écran réel. Rien n'est simulé.
 // adminOnly : visible uniquement pour un administrateur (rôle lu côté serveur).
 const MODULES = [
-  {id:'centrale', name:'La Centrale', icon:'store', desc:'Catalogue, affiliation et commissions', status:'soon'},
-  {id:'immobilier', name:'Immobilier', icon:'building', desc:'Terrains, parcelles et logements', status:'soon'},
-  {id:'transport', name:'Transport', icon:'truck', desc:'Transport, livraison et déménagement', status:'soon'},
+  {id:'centrale', name:'La Centrale', icon:'store', desc:'Catalogue, affiliation et commissions', status:'ready'},
+  {id:'immobilier', name:'Immobilier', icon:'building', desc:'Terrains, parcelles et logements', status:'ready'},
+  {id:'transport', name:'Transport', icon:'truck', desc:'Transport, livraison et déménagement', status:'ready'},
   {id:'dropads', name:'DropAds', icon:'megaphone', desc:'Campagnes publicitaires et diffuseurs', status:'soon'},
   {id:'dropalgo', name:'DropAlgo', icon:'spark', desc:'Aide au rapprochement des besoins et offres', status:'soon', adminOnly:true},
 ];
@@ -108,7 +108,7 @@ const P = {
   spark:'<path d="M12 3l2 5 5 2-5 2-2 5-2-5-5-2 5-2z"/>'};
 const icon = n => `<svg viewBox="0 0 24 24" aria-hidden="true">${P[n] || ''}</svg>`;
 const TABS = [['#/','Accueil','home'],['#/community','Communauté','community'],['#/contacts','Contacts','contacts'],['#/activity','Activité','activity'],['#/profile','Profil','profile']];
-const active = (u, h) => u === '#/' ? (h === '#/' || h.startsWith('#/m/'))
+const active = (u, h) => u === '#/' ? (h === '#/' || h.startsWith('#/m/') || /^#\/(centrale|immobilier|transport|product)/.test(h))
   : h === u || (u === '#/community' && (h.startsWith('#/p/') || h === '#/publish'))
   || (u === '#/activity' && h === '#/wallet') || (u === '#/profile' && h === '#/admin');
 function setNav() {
@@ -166,15 +166,17 @@ function authView(onDone,mode='login'){
 async function home() {
   const cnt = (t, f) => { const x = sb.from(t).select('*', {count:'exact', head:true}); return f ? f(x) : x; };
   const live = t => cnt(t, x => x.eq('user_id', state.me.id).eq('status', 'approved').gt('expires_at', new Date().toISOString()));
-  const [w, qt, mo, ms, rc, ct, nt, po, ps, pf] = await Promise.all([
+  const [w, qt, mo, ms, rc, ct, nt, po, ps, pf, pp, pt] = await Promise.all([
     sb.from('wallets').select('balance').maybeSingle(), sb.from('contact_quotas').select('credits').maybeSingle(),
     live('offers'), live('searches'),
     cnt('contact_requests', x => x.eq('recipient_id', state.me.id).eq('status', 'pending')), cnt('contacts'),
     cnt('notifications', x => x.eq('is_read', false)),
     state.isAdmin ? cnt('offers', x => x.eq('status', 'pending')) : {count:0},
     state.isAdmin ? cnt('searches', x => x.eq('status', 'pending')) : {count:0},
-    sb.from('profiles').select('full_name').eq('id', state.me.id).maybeSingle()]);
-  const todo = (po.count || 0) + (ps.count || 0);
+    sb.from('profiles').select('full_name').eq('id', state.me.id).maybeSingle(),
+    state.isAdmin ? cnt('properties', x => x.eq('status', 'pending')) : {count:0},
+    state.isAdmin ? cnt('transport_requests', x => x.eq('status', 'pending')) : {count:0}]);
+  const todo = (po.count || 0) + (ps.count || 0) + (pp.count || 0) + (pt.count || 0);
   const name = String(pf.data?.full_name || '').split(' ')[0];
   const mods = MODULES.filter(m => !m.adminOnly || state.isAdmin);
   app.innerHTML = `<p class="hello">Bonjour${name ? ', ' + esc(name) : ''} 👋</p>
@@ -191,6 +193,7 @@ async function home() {
 }
 
 // ===== src/pages/community.js =====
+const SKIND = {product:['La Centrale','#/product/'], property:['Immobilier','#/p/property/'], transport:['Transport','#/p/transport/'], offer:['Communauté','#/p/offer/']};
 async function community() {
   const feed = t => sb.from(t).select('*').eq('status', 'approved').order('created_at', {ascending:false}).limit(30);
   const mine = t => sb.from(t).select('id,title,status,expires_at').eq('user_id', state.me.id).order('created_at', {ascending:false}).limit(20);
@@ -198,39 +201,63 @@ async function community() {
   const tab = state.feedTab, list = (tab === 'offer' ? o : s).data || [];
   const my = [...(mo.data || []).map(x => ({...x, k:'offer'})), ...(ms.data || []).map(x => ({...x, k:'search'}))];
   app.innerHTML = `<div class="row"><h1>Communauté</h1><a class="btn" href="#/publish">Publier</a></div>
+  <form id="sf" class="card"><input id="sq" type="search" minlength="2" maxlength="80" required placeholder="Que cherchez-vous ? Produit, bien, transport, service…"><button class="full">Rechercher</button></form>
+  <div id="res"></div><div id="feed">
   <div><button class="${tab === 'offer' ? '' : 'alt'}" data-t="offer">Offres</button><button class="${tab === 'search' ? '' : 'alt'}" data-t="search">Recherches</button></div>
   ${list.map(r => `<a class="card" href="#/p/${tab}/${r.id}"><b>${esc(r.title)}</b><br><span class="tag">${esc(r.category || 'Général')}</span><span class="mut">${esc(r.city || '')}</span>
    <p class="mut" style="margin:6px 0 0">${esc(r.description).slice(0, 110)}</p></a>`).join('') || '<p class="card mut">Aucune publication validée pour le moment. Publiez la première.</p>'}
-  <h2>Mes publications</h2>${my.map(x => `<a class="card row" href="#/p/${x.k}/${x.id}"><span>${esc(x.title)}</span><span class="tag s">${esc(STATUS[x.status] || x.status)}</span></a>`).join('') || '<p class="card mut">Vous n’avez rien publié.</p>'}`;
+  <h2>Mes publications</h2>${my.map(x => `<a class="card row" href="#/p/${x.k}/${x.id}"><span>${esc(x.title)}</span><span class="tag s">${esc(STATUS[x.status] || x.status)}</span></a>`).join('') || '<p class="card mut">Vous n’avez rien publié.</p>'}</div>`;
   app.querySelectorAll('[data-t]').forEach(b => b.onclick = () => { state.feedTab = b.dataset.t; community(); });
+  // Recherche : si La Centrale, Immobilier, Transport ou la Communauté peuvent satisfaire le besoin, on n'affiche que cela ; sinon on propose de créer une recherche.
+  document.getElementById('sf').onsubmit = async e => { e.preventDefault();
+    const t = document.getElementById('sq').value.trim(), res = document.getElementById('res'), fd = document.getElementById('feed');
+    res.innerHTML = '<p class="card mut" aria-busy="true">Recherche…</p>'; fd.hidden = true;
+    try {
+      const rows = await q(sb.rpc('search_network', {p_q:t}));
+      if (!rows.length) res.innerHTML = `<div class="card"><b>Rien ne correspond à « ${esc(t)} ».</b>
+        <p class="mut">Ni La Centrale, ni Immobilier, ni Transport, ni la Communauté ne répondent à ce besoin pour le moment. Publiez une recherche : le réseau pourra vous répondre.</p>
+        <a class="btn full" href="#/publish/search/${encodeURIComponent(t)}">Créer une recherche</a></div><button class="alt full" id="clr">Effacer la recherche</button>`;
+      else res.innerHTML = Object.keys(SKIND).filter(k => rows.some(r => r.kind === k)).map(k => `<h2>${SKIND[k][0]}</h2>` +
+        rows.filter(r => r.kind === k).map(r => `<a class="card" href="${SKIND[k][1]}${r.id}"><b>${esc(r.title)}</b><br><span class="tag">${esc(r.subtitle)}</span>
+        ${r.price != null ? `<b>${fcfa(r.price)}</b> ` : ''}<span class="mut">${esc(r.city || '')}</span></a>`).join('')).join('') + '<button class="alt full" id="clr">Effacer la recherche</button>';
+      document.getElementById('clr').onclick = () => community();
+    } catch (_) { res.innerHTML = ''; fd.hidden = false; }
+  };
 }
 
 // ===== src/pages/publish.js =====
-function publish(){
+function publish(kind,txt){
   app.innerHTML=`<h1>Publier</h1><form id="f" class="card"><label>Type<select id="t"><option value="offer">Je propose (offre, service)</option><option value="search">Je cherche (fournisseur, prestataire)</option></select></label>
   <label>Titre<input id="ti" required maxlength="120"></label><label>Description<textarea id="d" rows="5" required></textarea></label>
   <label>Catégorie<input id="c" placeholder="Électroménager, transport…"></label><label>Ville<input id="v" placeholder="Ouagadougou"></label>
   <button class="full">Envoyer pour validation</button>
   <p class="mut">Pas d’annonce immobilière, de produit pour La Centrale ni de recherche d’emploi. Une fois validée, la publication reste visible 2 jours.</p></form>`;
+  if(kind==='search')document.getElementById('t').value='search';if(txt)document.getElementById('ti').value=decodeURIComponent(txt);
   document.getElementById('f').onsubmit=async e=>{e.preventDefault();
     try{await q(sb.from(t.value==='offer'?'offers':'searches').insert({user_id:state.me.id,title:ti.value.trim(),description:d.value.trim(),category:c.value.trim()||null,city:v.value.trim()||null}));
     toast('Publication envoyée : en attente de validation.');location.hash='#/'}catch(_){}};
 }
 
 // ===== src/pages/detail.js =====
-async function detail(type,id){
-  const r=await q(sb.from(type==='offer'?'offers':'searches').select('*').eq('id',id).single());
-  const mine=r.user_id===state.me.id;
-  app.innerHTML=`<a href="#/community">← Retour</a><h1>${esc(r.title)}</h1>
-  <p><span class="tag${type==='search'?' s':''}">${type==='offer'?'Offre':'Recherche'}</span><span class="tag">${esc(r.category||'Général')}</span><span class="mut">${esc(r.city||'')}</span></p>
-  <div class="card">${esc(r.description).replace(/\n/g,'<br>')}</div>
-  <p class="mut">Visible jusqu’au ${dt(r.expires_at)}${mine?' · Statut : '+esc(r.status):''}</p>
-  ${mine?'<p class="card">Ceci est votre publication.</p>':`<form id="cr" class="card"><label>Message (facultatif)<textarea id="m" rows="3"></textarea></label>
+const TBL = {offer:'offers', search:'searches', property:'properties', transport:'transport_requests'};
+const LBL = {offer:'Offre', search:'Recherche', property:'Immobilier', transport:'Transport'};
+const BACK = {offer:'#/community', search:'#/community', property:'#/immobilier', transport:'#/transport'};
+async function detail(type, id) {
+  if (!TBL[type]) throw new Error('type');
+  const r = await q(sb.from(TBL[type]).select('*').eq('id', id).single());
+  const mine = r.user_id === state.me.id;
+  const facts = [r.category, r.property_type && (r.operation + ' · ' + r.property_type), r.kind && (r.direction + ' · ' + r.kind),
+    r.price != null && fcfa(r.price), r.origin && r.destination && (r.origin + ' → ' + r.destination), r.travel_date && ('Date : ' + r.travel_date), r.city, r.district].filter(Boolean);
+  app.innerHTML = `<a href="${BACK[type]}">← Retour</a><h1>${esc(r.title)}</h1>
+  <p><span class="tag${type === 'search' ? ' s' : ''}">${LBL[type]}</span>${facts.map(f => `<span class="tag">${esc(f)}</span>`).join('')}</p>
+  <div class="card">${esc(r.description).replace(/\n/g, '<br>')}</div>
+  <p class="mut">Visible jusqu’au ${dt(r.expires_at)}${mine ? ' · Statut : ' + esc(r.status) : ''}</p>
+  ${mine ? '<p class="card">Ceci est votre publication.</p>' : `<form id="cr" class="card"><label>Message (facultatif)<textarea id="m" rows="3"></textarea></label>
   <button class="full">Demander une mise en relation</button>
   <p class="mut">Vous ne payez rien. Les coordonnées sont partagées si l’auteur accepte.</p></form>`}`;
-  if(!mine)document.getElementById('cr').onsubmit=async e=>{e.preventDefault();
-    try{await q(sb.from('contact_requests').insert({requester_id:state.me.id,recipient_id:r.user_id,source_type:type,source_id:id,message:m.value.trim()||null}));
-    toast('Demande envoyée.');location.hash='#/activity'}catch(_){}};
+  if (!mine) document.getElementById('cr').onsubmit = async e => { e.preventDefault();
+    try { await q(sb.from('contact_requests').insert({requester_id:state.me.id, recipient_id:r.user_id, source_type:type, source_id:id, message:document.getElementById('m').value.trim() || null}));
+      toast('Demande envoyée.'); location.hash = '#/activity'; } catch (_) {} };
 }
 
 // ===== src/pages/contacts.js =====
@@ -280,11 +307,11 @@ async function profile(){
 
 // ===== src/pages/admin.js =====
 async function admin(){
-  const [o,s,m,l]=await Promise.all([sb.from('offers').select('*').eq('status','pending'),sb.from('searches').select('*').eq('status','pending'),
-    sb.from('profiles').select('id,full_name,phone,account_status').order('created_at',{ascending:false}).limit(50),sb.from('admin_logs').select('*').order('created_at',{ascending:false}).limit(15)]);
-  const P=[...(o.data||[]).map(x=>({...x,k:'offer'})),...(s.data||[]).map(x=>({...x,k:'search'}))];
-  app.innerHTML=`<a href="#/profile">← Profil</a><h1>Administration</h1><h2>À valider (${P.length})</h2>
-  ${P.map(x=>`<div class="card"><span class="tag${x.k==='search'?' s':''}">${x.k==='offer'?'Offre':'Recherche'}</span><b>${esc(x.title)}</b><p class="mut">${esc(x.description)}</p>
+  const [o,s,m,l,pr,tr]=await Promise.all([sb.from('offers').select('*').eq('status','pending'),sb.from('searches').select('*').eq('status','pending'),
+    sb.from('profiles').select('id,full_name,phone,account_status').order('created_at',{ascending:false}).limit(50),sb.from('admin_logs').select('*').order('created_at',{ascending:false}).limit(15),sb.from('properties').select('*').eq('status','pending'),sb.from('transport_requests').select('*').eq('status','pending')]);
+  const P=[...(o.data||[]).map(x=>({...x,k:'offer'})),...(s.data||[]).map(x=>({...x,k:'search'})),...(pr.data||[]).map(x=>({...x,k:'property'})),...(tr.data||[]).map(x=>({...x,k:'transport'}))];
+  app.innerHTML=`<a href="#/profile">← Profil</a><h1>Administration</h1><a class="card" href="#/admin/centrale"><b>La Centrale</b><br><span class="mut">Fournisseurs, produits et demandes des membres</span></a><h2>À valider (${P.length})</h2>
+  ${P.map(x=>`<div class="card"><span class="tag${x.k==='search'?' s':''}">${{offer:'Offre',search:'Recherche',property:'Immobilier',transport:'Transport'}[x.k]}</span><b>${esc(x.title)}</b><p class="mut">${esc(x.description)}</p>
    <button data-m="approved" data-k="${x.k}" data-i="${x.id}">Valider</button><button class="bad" data-m="rejected" data-k="${x.k}" data-i="${x.id}">Refuser</button></div>`).join('')||'<p class="card mut">Rien en attente.</p>'}
   <h2>Membres</h2>${(m.data||[]).map(x=>`<div class="card"><b>${esc(x.full_name)}</b> <span class="mut">${esc(x.phone||'')} · ${esc(x.account_status)}</span><br>
    <button class="alt" data-cr="${x.id}">Créditer</button><button class="alt" data-su="${x.id}" data-s="${x.account_status==='active'?'suspended':'active'}">${x.account_status==='active'?'Suspendre':'Réactiver'}</button></div>`).join('')}
@@ -306,8 +333,120 @@ function soon(id) {
     : '<p class="card">Module introuvable.</p>';
 }
 
+// ===== src/pages/centrale.js =====
+let cat = '';
+const AV = {in_stock:'En stock', limited:'Stock limité', out_of_stock:'Rupture', unconfirmed:'Disponibilité à confirmer'};
+async function centrale() {
+  const rows = await q(sb.from('products').select('*,suppliers(display_name,certified,city)').eq('status', 'active').order('created_at', {ascending:false}).limit(80));
+  rows.sort((a, b) => (b.suppliers?.certified ? 1 : 0) - (a.suppliers?.certified ? 1 : 0));   // fournisseurs certifiés en premier
+  const cats = [...new Set(rows.map(r => r.category).filter(Boolean))], list = rows.filter(r => !cat || r.category === cat);
+  app.innerHTML = `<a href="#/">← Retour</a><h1>La Centrale</h1>
+  <div><button class="${cat ? 'alt' : ''}" data-c="">Tout</button>${cats.map(c => `<button class="${cat === c ? '' : 'alt'}" data-c="${esc(c)}">${esc(c)}</button>`).join('')}</div>
+  ${list.map(r => `<a class="card" href="#/product/${r.id}"><b>${esc(r.title)}</b><br>
+   ${r.suppliers?.certified ? '<span class="tag">Certifié</span>' : ''}<span class="tag s">${esc(AV[r.availability])}</span><span class="mut">${esc(r.suppliers?.display_name || '')}</span>
+   <div class="row" style="margin-top:8px"><b>${fcfa(r.price)}</b>${r.commission != null ? `<span class="mut">Commission annoncée : ${fcfa(r.commission)}</span>` : ''}</div></a>`).join('') || '<p class="card mut">Le catalogue est en cours de constitution.</p>'}`;
+  app.querySelectorAll('[data-c]').forEach(b => b.onclick = () => { cat = b.dataset.c; centrale(); });
+}
+async function product(id) {
+  const r = await q(sb.from('products').select('*,suppliers(display_name,certified,city)').eq('id', id).single());
+  app.innerHTML = `<a href="#/centrale">← La Centrale</a><h1>${esc(r.title)}</h1>
+  <p>${r.suppliers?.certified ? '<span class="tag">Fournisseur certifié</span>' : ''}<span class="tag s">${esc(AV[r.availability])}</span><span class="tag">${esc(r.category || 'Général')}</span></p>
+  <div class="card"><b style="font-size:1.4rem">${fcfa(r.price)}</b>${r.commission != null ? `<br><span class="mut">Commission annoncée : ${fcfa(r.commission)}</span>` : ''}
+  <p>${esc(r.description).replace(/\n/g, '<br>')}</p><p class="mut">Fournisseur : ${esc(r.suppliers?.display_name || '')} ${esc(r.suppliers?.city || '')}</p></div>
+  <div class="card"><label>Message (facultatif)<textarea id="lm" rows="2"></textarea></label>
+  <button data-k="buy">Je suis intéressé</button><button class="alt" data-k="promote">Je veux le promouvoir</button>
+  <p class="mut">L’équipe DropAffy traite votre demande. Les coordonnées du fournisseur restent protégées.</p></div>`;
+  app.querySelectorAll('[data-k]').forEach(b => b.onclick = async () => {
+    const x = await sb.from('product_leads').insert({user_id:state.me.id, product_id:id, kind:b.dataset.k, message:document.getElementById('lm').value.trim() || null});
+    toast(x.error ? (x.error.code === '23505' ? 'Vous avez déjà envoyé cette demande.' : x.error.message) : 'Demande envoyée. L’équipe vous contactera.'); });
+}
+
+// ===== src/pages/immobilier.js =====
+let op = '';
+async function immobilier(a) {
+  if (a === 'new') return formProp();
+  const rows = await q(sb.from('properties').select('*').eq('status', 'approved').gt('expires_at', new Date().toISOString()).order('created_at', {ascending:false}).limit(60));
+  const list = rows.filter(r => !op || r.operation === op);
+  app.innerHTML = `<div class="row"><h1>Immobilier</h1><a class="btn" href="#/immobilier/new">Publier un bien</a></div>
+  <div>${[['', 'Tout'], ['vente', 'À vendre'], ['location', 'À louer']].map(([v, l]) => `<button class="${op === v ? '' : 'alt'}" data-o="${v}">${l}</button>`).join('')}</div>
+  ${list.map(r => `<a class="card" href="#/p/property/${r.id}"><b>${esc(r.title)}</b><br><span class="tag">${esc(r.operation)}</span><span class="tag">${esc(r.property_type)}</span><span class="mut">${esc(r.city || '')} ${esc(r.district || '')}</span>
+   ${r.price != null ? `<div style="margin-top:6px"><b>${fcfa(r.price)}</b></div>` : ''}</a>`).join('') || '<p class="card mut">Aucune annonce validée pour le moment.</p>'}`;
+  app.querySelectorAll('[data-o]').forEach(b => b.onclick = () => { op = b.dataset.o; immobilier(); });
+}
+function formProp() {
+  app.innerHTML = `<a href="#/immobilier">← Retour</a><h1>Publier un bien</h1><formProp id="pf" class="card">
+  <label>Type<select name="property_type"><option value="maison">Maison</option><option value="terrain">Terrain</option><option value="parcelle">Parcelle</option><option value="appartement">Appartement</option><option value="boutique">Boutique</option><option value="autre">Autre</option></select></label>
+  <label>Opération<select name="operation"><option value="vente">Vente</option><option value="location">Location</option></select></label>
+  <label>Titre<input name="title" required maxlength="120"></label><label>Description<textarea name="description" rows="4" required></textarea></label>
+  <label>Prix (FCFA)<input name="price" type="number" min="0" inputmode="numeric"></label><label>Ville<input name="city"></label><label>Quartier<input name="district"></label>
+  <button class="full">Envoyer pour validation</button><p class="mut">L’annonce est vérifiée avant d’être visible.</p></formProp>`;
+  document.getElementById('pf').onsubmit = async e => { e.preventDefault(); const f = Object.fromEntries(new FormData(e.target));
+    try { await q(sb.from('properties').insert({user_id:state.me.id, property_type:f.property_type, operation:f.operation, title:f.title.trim(), description:f.description.trim(),
+      price:f.price === '' ? null : Number(f.price), city:f.city.trim() || null, district:f.district.trim() || null}));
+      toast('Annonce envoyée : en attente de validation.'); location.hash = '#/immobilier'; } catch (_) {} };
+}
+
+// ===== src/pages/transport.js =====
+let dir = '';
+const TKIND = {livraison:'Livraison', marchandises:'Marchandises', demenagement:'Déménagement', personnes:'Personnes', autre:'Autre'};
+async function transport(a) {
+  if (a === 'new') return formTr();
+  const rows = await q(sb.from('transport_requests').select('*').eq('status', 'approved').gt('expires_at', new Date().toISOString()).order('created_at', {ascending:false}).limit(60));
+  const list = rows.filter(r => !dir || r.direction === dir);
+  app.innerHTML = `<div class="row"><h1>Transport</h1><a class="btn" href="#/transport/new">Publier</a></div>
+  <div>${[['', 'Tout'], ['demande', 'Demandes'], ['offre', 'Prestataires']].map(([v, l]) => `<button class="${dir === v ? '' : 'alt'}" data-d="${v}">${l}</button>`).join('')}</div>
+  ${list.map(r => `<a class="card" href="#/p/transport/${r.id}"><b>${esc(r.title)}</b><br><span class="tag">${esc(TKIND[r.kind])}</span><span class="tag s">${r.direction === 'offre' ? 'Prestataire' : 'Demande'}</span>
+   <span class="mut">${esc(r.origin || '')}${r.destination ? ' → ' + esc(r.destination) : ''}</span></a>`).join('') || '<p class="card mut">Aucune annonce validée pour le moment.</p>'}`;
+  app.querySelectorAll('[data-d]').forEach(b => b.onclick = () => { dir = b.dataset.d; transport(); });
+}
+function formTr() {
+  app.innerHTML = `<a href="#/transport">← Retour</a><h1>Publier</h1><formTr id="tf" class="card">
+  <label>Vous êtes<select name="direction"><option value="demande">J’ai un besoin de transport</option><option value="offre">Je propose un service de transport</option></select></label>
+  <label>Type<select name="kind">${Object.entries(TKIND).map(([v, l]) => `<option value="${v}">${l}</option>`).join('')}</select></label>
+  <label>Titre<input name="title" required maxlength="120"></label><label>Description (volume, contraintes…)<textarea name="description" rows="4" required></textarea></label>
+  <label>Départ<input name="origin"></label><label>Destination<input name="destination"></label><label>Date<input name="travel_date" type="date"></label>
+  <button class="full">Envoyer pour validation</button></formTr>`;
+  document.getElementById('tf').onsubmit = async e => { e.preventDefault(); const f = Object.fromEntries(new FormData(e.target));
+    try { await q(sb.from('transport_requests').insert({user_id:state.me.id, kind:f.kind, direction:f.direction, title:f.title.trim(), description:f.description.trim(),
+      origin:f.origin.trim() || null, destination:f.destination.trim() || null, travel_date:f.travel_date || null}));
+      toast('Annonce envoyée : en attente de validation.'); location.hash = '#/transport'; } catch (_) {} };
+}
+
+// ===== src/pages/adminCentrale.js =====
+async function adminCentrale() {
+  const [sp, pr, ld] = await Promise.all([sb.from('suppliers').select('*').order('created_at', {ascending:false}),
+    sb.from('products').select('*,suppliers(display_name)').order('created_at', {ascending:false}).limit(60),
+    sb.from('product_leads').select('*,products(title),profiles(full_name,phone)').order('created_at', {ascending:false}).limit(60)]);
+  const S = sp.data || [], P = pr.data || [], L = ld.data || [];
+  app.innerHTML = `<a href="#/admin">← Administration</a><h1>La Centrale</h1>
+  <h2>Demandes des membres (${L.filter(x => x.status === 'new').length} nouvelles)</h2>
+  ${L.map(x => `<div class="card"><b>${esc(x.products?.title)}</b> <span class="tag">${x.kind === 'buy' ? 'Achat' : 'Promotion'}</span><span class="tag s">${esc(x.status)}</span><br>
+   <span class="mut">${esc(x.profiles?.full_name)} · ${esc(x.profiles?.phone)}</span><p>${esc(x.message || '')}</p>
+   ${x.status === 'new' ? `<button data-h="${x.id}">Marquer traitée</button>` : ''}</div>`).join('') || '<p class="card mut">Aucune demande.</p>'}
+  <h2>Nouveau fournisseur</h2><form id="sf" class="card"><label>Nom affiché (public)<input name="display_name" required></label>
+  <label>Nom réel (privé)<input name="real_name"></label><label>Téléphone (privé)<input name="phone"></label>
+  <label>Catégorie<input name="category"></label><label>Ville<input name="city"></label>
+  <label><input name="certified" type="checkbox" style="width:auto"> Fournisseur certifié</label><button class="full">Créer le fournisseur</button></form>
+  <h2>Nouveau produit</h2><form id="pf" class="card"><label>Fournisseur<select name="supplier_id" required>${S.map(s => `<option value="${s.id}">${esc(s.display_name)}</option>`).join('')}</select></label>
+  <label>Titre<input name="title" required></label><label>Description<textarea name="description" rows="3"></textarea></label><label>Catégorie<input name="category"></label>
+  <label>Prix (FCFA)<input name="price" type="number" min="0" required></label><label>Commission annoncée (FCFA)<input name="commission" type="number" min="0"></label>
+  <label>Disponibilité<select name="availability"><option value="unconfirmed">À confirmer</option><option value="in_stock">En stock</option><option value="limited">Stock limité</option><option value="out_of_stock">Rupture</option></select></label>
+  <label>Statut<select name="status"><option value="draft">Brouillon</option><option value="active">Publié</option></select></label><button class="full">Créer le produit</button></form>
+  <h2>Produits (${P.length})</h2>${P.map(x => `<div class="card row"><span><b>${esc(x.title)}</b><br><span class="mut">${esc(x.suppliers?.display_name)} · ${fcfa(x.price)}</span></span>
+   <button class="alt" data-p="${x.id}" data-s="${x.status === 'active' ? 'inactive' : 'active'}">${x.status === 'active' ? 'Retirer' : 'Publier'}</button></div>`).join('')}`;
+  const go = async f => { try { await f(); adminCentrale(); } catch (_) {} };
+  document.getElementById('sf').onsubmit = e => { e.preventDefault(); const f = Object.fromEntries(new FormData(e.target)); go(async () => {
+    const s = await q(sb.from('suppliers').insert({display_name:f.display_name.trim(), category:f.category.trim() || null, city:f.city.trim() || null, certified:f.certified === 'on'}).select('id').single());
+    if (f.real_name || f.phone) await q(sb.from('supplier_private').insert({supplier_id:s.id, real_name:f.real_name.trim() || null, phone:f.phone.trim() || null})); toast('Fournisseur créé.'); }); };
+  document.getElementById('pf').onsubmit = e => { e.preventDefault(); const f = Object.fromEntries(new FormData(e.target)); go(async () => {
+    await q(sb.from('products').insert({supplier_id:f.supplier_id, title:f.title.trim(), description:f.description.trim(), category:f.category.trim() || null, price:Number(f.price),
+      commission:f.commission === '' ? null : Number(f.commission), availability:f.availability, status:f.status})); toast('Produit créé.'); }); };
+  app.querySelectorAll('[data-h]').forEach(b => b.onclick = () => go(() => q(sb.from('product_leads').update({status:'handled'}).eq('id', b.dataset.h))));
+  app.querySelectorAll('[data-p]').forEach(b => b.onclick = () => go(() => q(sb.from('products').update({status:b.dataset.s}).eq('id', b.dataset.p))));
+}
+
 // ===== src/main.js =====
-const ROUTES = {'':home, community, publish, contacts, activity, wallet, profile, admin, p:detail, m:soon};
+const ROUTES = {'':home, community, publish, contacts, activity, wallet, profile, admin:a => a === 'centrale' ? adminCentrale() : admin(), p:detail, m:soon, centrale, product, immobilier, transport};
 
 async function route() {
   if (!state.me) return authView(boot);
