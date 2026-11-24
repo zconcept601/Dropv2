@@ -433,10 +433,44 @@ async function activities(tab) {
     box.querySelectorAll('[data-a]').forEach(b => b.onclick = async () => { if (b.dataset.a === 'accepted' && !confirm('Accepter ? Un crédit de mise en relation sera utilisé.')) return;
       try { await q(sb.from('contact_requests').update({status:b.dataset.a}).eq('id', b.dataset.i)); activities('requests'); } catch (_) {} });
   } else if (tab === 'affil') {
-    const L = (await q(sb.from('product_leads').select('id,status,product_id,products(title)').eq('user_id', state.me.id).eq('kind', 'promote').order('created_at', {ascending:false}).limit(50))) || [];
-    const LS2 = {new:'En attente de validation', validated:'Active', refused:'Refusée'};
-    box.innerHTML = '<p class="mut">Vos demandes pour promouvoir des produits de La Centrale. Le suivi des ventes et des commissions n’est pas encore activé.</p>' +
-      (L.map(x => `<a class="card row" href="#/product/${x.product_id}"><span>${esc(x.products?.title)}</span><span class="tag s">${LS2[x.status]}</span></a>`).join('') || '<p class="card mut">Aucune affiliation. Demandez à promouvoir un produit depuis La Centrale.</p>') + '<a class="btn" href="#/centrale">Ouvrir La Centrale</a>';
+    // Espace affilié : affiliations actives + commissions réelles (issues de commission_ledger)
+    const [aff, cm] = await Promise.all([
+      sb.from('product_leads').select('id,status,product_id,products(title,price,commission)').eq('user_id', state.me.id).eq('kind','promote').order('created_at', {ascending:false}).limit(100),
+      sb.from('commission_ledger').select('*').eq('user_id', state.me.id).order('created_at', {ascending:false}).limit(100)]);
+    const A = aff.data || [], C = cm.data || [];
+    const active = A.filter(x => x.status === 'validated');
+    const pending = A.filter(x => x.status === 'new');
+    const refused = A.filter(x => x.status === 'refused');
+    const cmTotal = C.reduce((a, x) => a + (x.amount || 0), 0);
+    box.innerHTML = `
+    <div class="card hero"><small>Mes affiliations</small><b>${active.length}</b>
+      <div class="row"><small>${pending.length} en attente · ${refused.length} refusée(s)</small><a class="pill" href="#/centrale">Découvrir</a></div></div>
+
+    <div class="grid3">
+      <div class="card stat"><b>${active.length}</b><span class="mut">Affiliations actives</span></div>
+      <div class="card stat"><b>${pending.length}</b><span class="mut">En attente</span></div>
+      <div class="card stat"><b>${fcfa(cmTotal)}</b><span class="mut">Commissions validées</span></div>
+    </div>
+
+    <div class="card"><b>Ventes et commissions de produits</b>
+      <p class="mut">Le suivi des ventes de produits n’est pas encore activé côté serveur. Les commissions listées ci-dessous proviennent uniquement de la table <code>commission_ledger</code> (commissions d’abonnement fournisseur, 40 %). Pour le suivi des ventes produits, une évolution Supabase est nécessaire.</p>
+    </div>
+
+    <h2>Affiliations actives (${active.length})</h2>
+    ${active.map(x => `<a class="card" href="#/product/${x.product_id}"><b>${esc(x.products?.title)}</b><br>
+      <span class="tag">Active</span>
+      <span class="mut">Prix : ${fcfa(x.products?.price)}</span>
+      ${x.products?.commission != null ? `<br><span class="mut">Commission annoncée : ${fcfa(x.products.commission)}</span>` : ''}</a>`).join('') || '<p class="card mut">Aucune affiliation active.</p>'}
+
+    <h2>Demandes en attente (${pending.length})</h2>
+    ${pending.map(x => `<a class="card" href="#/product/${x.product_id}"><b>${esc(x.products?.title)}</b><br><span class="tag s">En attente</span></a>`).join('') || '<p class="card mut">Aucune demande en attente.</p>'}
+
+    ${refused.length ? `<h2>Demandes refusées (${refused.length})</h2>${refused.map(x => `<a class="card" href="#/product/${x.product_id}"><b>${esc(x.products?.title)}</b><br><span class="tag s">Refusée</span></a>`).join('')}` : ''}
+
+    <h2>Historique des commissions (${C.length})</h2>
+    ${C.map(c => `<div class="card row"><span class="mut">${dt(c.created_at)} · 40 % de ${fcfa(c.base_amount)}</span><b>${fcfa(c.amount)}</b></div>`).join('') || '<p class="card mut">Aucune commission enregistrée.</p>'}
+
+    <p><a class="btn" href="#/centrale">Découvrir de nouveaux produits</a></p>`;
   } else if (tab === 'products') {
     box.innerHTML = '<a class="card" href="#/seller"><b>Mes fiches et produits</b><br><span class="mut">Créez des fiches fournisseurs, proposez des produits et traitez les demandes reçues.</span></a>';
   } else {
@@ -577,41 +611,150 @@ function soon(id) {
 }
 
 // ===== src/pages/centrale.js =====
+// Catalogue produits : recherche, filtres, tri, cartes professionnelles.
+// Images : le schéma actuel n'expose pas de colonne d'image -> fallback identifié clairement.
 let cat = '';
+let qsearch = '';      // recherche
+let sortBy = 'new';    // new | price_asc | price_desc | commission_desc | certified
 const AV = {in_stock:'En stock', limited:'Stock limité', out_of_stock:'Rupture', unconfirmed:'Disponibilité à confirmer'};
+
+function productCard(r) {
+  const img = r.image_url || null; // champ absent aujourd'hui -> fallback ci-dessous
+  const thumb = img
+    ? `<img src="${esc(img)}" alt="${esc(r.title)}" style="width:100%;height:140px;object-fit:cover;border-radius:12px;margin-bottom:8px" onerror="this.replaceWith(Object.assign(document.createElement('div'),{textContent:'Image indisponible',className:'mut',style:'display:grid;place-items:center;height:140px;background:var(--tint);border-radius:12px;margin-bottom:8px'}))">`
+    : `<div class="mut" style="display:grid;place-items:center;height:140px;background:var(--tint);border-radius:12px;margin-bottom:8px;font-size:.75rem">Image non renseignée</div>`;
+  return `<a class="card" href="#/product/${r.id}">
+    ${thumb}
+    <b>${esc(r.title)}</b><br>
+    ${r.suppliers?.certified ? '<span class="tag">Certifié</span>' : ''}<span class="tag s">${esc(AV[r.availability] || '—')}</span>
+    <span class="tag">${esc(r.category || 'Général')}</span>
+    <span class="mut">${esc(r.suppliers?.display_name || '')}</span>
+    <div class="row" style="margin-top:8px"><b>${fcfa(r.price)}</b>${r.commission != null ? `<span class="mut">Commission : ${fcfa(r.commission)}</span>` : '<span class="mut">Commission non renseignée</span>'}</div>
+  </a>`;
+}
+
 async function centrale() {
-  const rows = await q(sb.from('products').select('*,suppliers(display_name,certified,city)').eq('status', 'active').order('created_at', {ascending:false}).limit(80));
-  rows.sort((a, b) => (b.suppliers?.certified ? 1 : 0) - (a.suppliers?.certified ? 1 : 0));   // fournisseurs certifiés en premier
-  const cats = [...new Set(rows.map(r => r.category).filter(Boolean))], list = rows.filter(r => !cat || r.category === cat);
-  app.innerHTML = `<a href="#/">← Retour</a><div class="row"><h1>La Centrale</h1><a class="btn" href="#/seller">Publier un produit</a></div>
-  <div><button class="${cat ? 'alt' : ''}" data-c="">Tout</button>${cats.map(c => `<button class="${cat === c ? '' : 'alt'}" data-c="${esc(c)}">${esc(c)}</button>`).join('')}</div>
-  ${list.map(r => `<a class="card" href="#/product/${r.id}"><b>${esc(r.title)}</b><br>
-   ${r.suppliers?.certified ? '<span class="tag">Certifié</span>' : ''}<span class="tag s">${esc(AV[r.availability])}</span><span class="mut">${esc(r.suppliers?.display_name || '')}</span>
-   <div class="row" style="margin-top:8px"><b>${fcfa(r.price)}</b>${r.commission != null ? `<span class="mut">Commission annoncée : ${fcfa(r.commission)}</span>` : ''}</div></a>`).join('') || '<p class="card mut">Le catalogue est en cours de constitution.</p>'}`;
+  const rows = await q(sb.from('products').select('*,suppliers(display_name,certified,city)').eq('status','active').order('created_at', {ascending:false}).limit(200));
+  // Tri par défaut : certifiés d'abord, puis date
+  rows.sort((a, b) => (b.suppliers?.certified ? 1 : 0) - (a.suppliers?.certified ? 1 : 0));
+  const cats = [...new Set(rows.map(r => r.category).filter(Boolean))].sort();
+  // Filtres/recherche
+  let list = rows.slice();
+  if (cat) list = list.filter(r => r.category === cat);
+  if (qsearch.trim()) {
+    const needle = qsearch.trim().toLowerCase();
+    list = list.filter(r =>
+      String(r.title || '').toLowerCase().includes(needle) ||
+      String(r.description || '').toLowerCase().includes(needle) ||
+      String(r.category || '').toLowerCase().includes(needle) ||
+      String(r.suppliers?.display_name || '').toLowerCase().includes(needle));
+  }
+  if (sortBy === 'price_asc') list.sort((a, b) => a.price - b.price);
+  else if (sortBy === 'price_desc') list.sort((a, b) => b.price - a.price);
+  else if (sortBy === 'commission_desc') list.sort((a, b) => (b.commission || 0) - (a.commission || 0));
+  else if (sortBy === 'certified') list.sort((a, b) => (b.suppliers?.certified ? 1 : 0) - (a.suppliers?.certified ? 1 : 0));
+
+  // Indicateurs personnels RÉELS (affiliation)
+  const [myLeads, myCms] = await Promise.all([
+    sb.from('product_leads').select('id,status').eq('user_id', state.me.id).eq('kind','promote').limit(200),
+    sb.from('commission_ledger').select('amount').eq('user_id', state.me.id).limit(200)]);
+  const leads = myLeads.data || [], cm = myCms.data || [];
+  const affActive = leads.filter(x => x.status === 'validated').length;
+  const affPending = leads.filter(x => x.status === 'new').length;
+  const cmTotal = cm.reduce((a, x) => a + (x.amount || 0), 0);
+
+  app.innerHTML = `<a href="#/">← Retour</a>
+  <div class="row"><h1>La Centrale</h1><a class="btn" href="#/seller">Publier un produit</a></div>
+  <div class="card"><b>Catalogue d'affiliation DropAffy</b>
+    <p class="mut">Découvrez les produits proposés par nos fournisseurs, demandez à les promouvoir et développez votre activité commerciale.</p>
+    <div class="grid" style="grid-template-columns:repeat(2,1fr)">
+      <a class="action" href="#/activity/affil"><span class="ico">${icon('link')}</span>Mes affiliations</a>
+      <a class="action" href="#/activity/orders"><span class="ico">${icon('store')}</span>Mes commandes</a>
+    </div>
+  </div>
+
+  <div class="grid3">
+    <div class="card stat"><b>${affActive}</b><span class="mut">Affiliation(s) active(s)</span></div>
+    <div class="card stat"><b>${affPending}</b><span class="mut">Demande(s) en attente</span></div>
+    <div class="card stat"><b>${fcfa(cmTotal)}</b><span class="mut">Commissions cumulées</span></div>
+  </div>
+
+  <form id="sf" class="card">
+    <label>Rechercher un produit<input id="sq" type="search" placeholder="Nom, catégorie, fournisseur…" value="${esc(qsearch)}"></label>
+    <div class="row">
+      <select id="st" style="flex:1;margin:0">
+        <option value="new" ${sortBy==='new'?'selected':''}>Plus récents</option>
+        <option value="price_asc" ${sortBy==='price_asc'?'selected':''}>Prix croissant</option>
+        <option value="price_desc" ${sortBy==='price_desc'?'selected':''}>Prix décroissant</option>
+        <option value="commission_desc" ${sortBy==='commission_desc'?'selected':''}>Meilleure commission</option>
+        <option value="certified" ${sortBy==='certified'?'selected':''}>Fournisseurs certifiés</option>
+      </select>
+    </div>
+  </form>
+
+  <div class="chips"><button class="${cat ? 'alt' : ''}" data-c="">Toutes catégories</button>${cats.map(c => `<button class="${cat === c ? '' : 'alt'}" data-c="${esc(c)}">${esc(c)}</button>`).join('')}</div>
+
+  <h2>Produits disponibles (${list.length})</h2>
+  <div class="grid">${list.map(productCard).join('') || '<p class="card mut">Aucun produit ne correspond à votre recherche.</p>'}</div>`;
+
+  document.getElementById('sf').onsubmit = e => { e.preventDefault(); qsearch = document.getElementById('sq').value; sortBy = document.getElementById('st').value; centrale(); };
+  document.getElementById('st').onchange = () => { sortBy = document.getElementById('st').value; qsearch = document.getElementById('sq').value; centrale(); };
   app.querySelectorAll('[data-c]').forEach(b => b.onclick = () => { cat = b.dataset.c; centrale(); });
 }
-const LK = {contact:'Contact', buy:'Achat', promote:'Promotion'}, LS = {new:'En attente', validated:'Validée', refused:'Refusée'};
+
+// ===== src/pages/product.js =====
+const LK = {contact:'Mise en relation', buy:'Intention d’achat', promote:'Demande de promotion'};
+const LS = {new:'En attente', validated:'Validée', refused:'Refusée'};
+
 async function product(id) {
   const r = await q(sb.from('products').select('*,suppliers(display_name,certified,city)').eq('id', id).single());
-  app.innerHTML = `<a href="#/centrale">← La Centrale</a><h1>${esc(r.title)}</h1>
-  <p>${r.suppliers?.certified ? '<span class="tag">Fournisseur certifié</span>' : ''}<span class="tag s">${esc(AV[r.availability])}</span><span class="tag">${esc(r.category || 'Général')}</span></p>
-  <div class="card"><b style="font-size:1.4rem">${fcfa(r.price)}</b>${r.commission != null ? `<br><span class="mut">Commission annoncée : ${fcfa(r.commission)}</span>` : ''}
-  <p>${esc(r.description).replace(/\n/g, '<br>')}</p><p class="mut">Fournisseur : ${esc(r.suppliers?.display_name || '')} ${esc(r.suppliers?.city || '')}</p></div>
-  ${r.created_by === state.me.id ? '<p class="card">Ceci est votre produit.</p>' : `<div class="card"><label>Message (facultatif)<textarea id="lm" rows="2"></textarea></label>
-  <button data-k="contact">Contacter</button><button data-k="buy">Acheter</button><button class="alt" data-k="promote">Promouvoir</button>
-  <p class="mut">L’ambassadeur qui a publié ce produit examine votre demande. Une fois validée, les coordonnées du fournisseur s’affichent ici.</p></div>`}
+  const isMine = r.created_by === state.me.id;
+  const img = r.image_url || null;
+
+  app.innerHTML = `<a href="#/centrale">← La Centrale</a>
+  <h1>${esc(r.title)}</h1>
+  <p>${r.suppliers?.certified ? '<span class="tag">Fournisseur certifié</span>' : ''}<span class="tag s">${esc(AV[r.availability] || '—')}</span><span class="tag">${esc(r.category || 'Général')}</span></p>
+
+  <div class="card">
+    ${img ? `<img src="${esc(img)}" alt="${esc(r.title)}" style="width:100%;border-radius:12px;margin-bottom:12px" onerror="this.style.display='none'">`
+          : `<div class="mut" style="display:grid;place-items:center;height:180px;background:var(--tint);border-radius:12px;margin-bottom:12px;font-size:.85rem">Image non renseignée dans la base</div>`}
+    <b style="font-size:1.5rem">${fcfa(r.price)}</b>
+    ${r.commission != null ? `<p class="mut">Commission d'affiliation : <b style="color:var(--brand)">${fcfa(r.commission)}</b></p>` : '<p class="mut">Commission d’affiliation : non renseignée</p>'}
+    <p>${esc(r.description || '').replace(/\n/g, '<br>')}</p>
+    <p class="mut">Fournisseur : ${esc(r.suppliers?.display_name || '')} ${esc(r.suppliers?.city || '')}</p>
+  </div>
+
+  ${isMine ? '<p class="card mut">Ceci est votre produit.</p>' : `
+  <div class="card">
+    <label>Message (facultatif)<textarea id="lm" rows="2" placeholder="Précisez votre demande…"></textarea></label>
+    <button data-k="contact">Contacter le fournisseur</button>
+    <button data-k="buy">Je veux acheter</button>
+    <button class="alt" data-k="promote">Je veux promouvoir</button>
+    <p class="mut" style="font-size:.8rem">Contacter : demande de mise en relation · Acheter : intention d’achat · Promouvoir : demande d’affiliation. Les coordonnées du fournisseur sont révélées uniquement après validation.</p>
+  </div>`}
+
   <div id="leads"></div>`;
+
   const leads = async () => {
     const L = (await q(sb.from('product_leads').select('*').eq('product_id', id).eq('user_id', state.me.id).order('created_at', {ascending:false}))) || [];
-    const parts = await Promise.all(L.map(async l => { let c = '';
-      if (l.status === 'validated') { const x = await sb.rpc('get_supplier_contact', {p_lead_id:l.id}), d = x.data?.[0];
-        if (d?.phone) c = `<a class="btn" href="tel:${esc(d.phone)}">Appeler</a><a class="btn" href="https://wa.me/${esc(String(d.whatsapp || d.phone).replace(/\D/g, ''))}">WhatsApp</a>`; }
-      return `<div class="card"><span class="tag">${LK[l.kind]}</span><span class="tag s">${LS[l.status]}</span>${l.status === 'refused' && l.decision_note ? `<p class="mut">${esc(l.decision_note)}</p>` : ''}<div>${c}</div></div>`; }));
-    document.getElementById('leads').innerHTML = L.length ? '<h2>Mes demandes</h2>' + parts.join('') : '';
+    const parts = await Promise.all(L.map(async l => {
+      let extra = '';
+      if (l.status === 'validated') {
+        const x = await sb.rpc('get_supplier_contact', {p_lead_id:l.id}), d = x.data?.[0];
+        if (d?.phone) extra = `<a class="btn" href="tel:${esc(d.phone)}">Appeler</a><a class="btn" href="https://wa.me/${esc(String(d.whatsapp || d.phone).replace(/\D/g,''))}">WhatsApp</a>`;
+      }
+      return `<div class="card"><span class="tag">${LK[l.kind]}</span><span class="tag s">${LS[l.status] || l.status}</span>
+        ${l.status === 'refused' && l.decision_note ? `<p class="mut">Motif : ${esc(l.decision_note)}</p>` : ''}
+        <div>${extra}</div></div>`;
+    }));
+    document.getElementById('leads').innerHTML = L.length ? '<h2>Mes demandes sur ce produit</h2>' + parts.join('') : '';
   };
+
   app.querySelectorAll('[data-k]').forEach(b => b.onclick = async () => {
     const x = await sb.from('product_leads').insert({user_id:state.me.id, product_id:id, kind:b.dataset.k, message:document.getElementById('lm').value.trim() || null});
-    toast(x.error ? (x.error.code === '23505' ? 'Vous avez déjà envoyé cette demande.' : x.error.message) : 'Demande envoyée à l’ambassadeur.'); await leads(); });
+    toast(x.error ? (x.error.code === '23505' ? 'Vous avez déjà envoyé cette demande.' : x.error.message) : 'Demande envoyée : le fournisseur ou l’ambassadeur va l’examiner.');
+    await leads();
+  });
   await leads();
 }
 
@@ -674,6 +817,9 @@ async function adminCentrale() {
     sb.from('ambassadors').select('*,profiles!ambassadors_user_id_fkey(full_name,phone)'), sb.from('profiles').select('id,full_name,phone').order('created_at', {ascending:false}).limit(200)]);
   const S = sp.data || [], P = pr.data || [], L = ld.data || [], A = am.data || [], M = mb.data || [], PEND = P.filter(x => x.status === 'pending');
   app.innerHTML = `<a href="#/admin">← Administration</a><h1>La Centrale</h1>
+  <div class="card mut" style="font-size:.82rem"><b>Rappel quotas fournisseurs</b><br>
+    Abonnement : 3 000 FCFA/mois · 20 mises en contact gratuites/mois · puis 10 contacts supplémentaires · puis paiement 100 FCFA pour 10 contacts supplémentaires.<br>
+    <i>Le compteur par fournisseur doit être vérifié côté serveur (non disponible actuellement en base).</i></div>
   <h2>Produits à valider (${PEND.length})</h2>${PEND.map(x => `<div class="card"><b>${esc(x.title)}</b> <span class="mut">${esc(x.suppliers?.display_name)} · ${fcfa(x.price)}</span><p class="mut">${esc(x.description)}</p>
    <button data-r="active" data-i="${x.id}">Valider</button><button class="bad" data-r="rejected" data-i="${x.id}">Refuser</button></div>`).join('') || '<p class="card mut">Aucun produit en attente.</p>'}
   <h2>Ambassadeurs (${A.length})</h2>${A.map(x => `<div class="card row"><span><b>${esc(x.profiles?.full_name)}</b><br><span class="mut">${x.paid_until && new Date(x.paid_until) > new Date() ? 'Actif jusqu’au ' + dt(x.paid_until) : 'Abonnement à payer ou expiré'}</span></span>
@@ -715,47 +861,107 @@ async function adminCentrale() {
 }
 
 // ===== src/pages/ambassador.js =====
+// Espace personnel : fiches fournisseurs, produits, demandes reçues, commissions, affiliations.
+// Tout membre peut créer des fiches et proposer des produits.
 const AVL = {in_stock:'En stock', limited:'Stock limité', out_of_stock:'Rupture', unconfirmed:'À confirmer'};
 const PST = {pending:'En attente de validation', active:'Publié', rejected:'Refusé', inactive:'Retiré', draft:'Brouillon'};
+const LKD = {contact:'Mise en relation', buy:'Intention d’achat', promote:'Demande de promotion'};
+const LSD = {new:'En attente', validated:'Validée', refused:'Refusée'};
+
 async function seller() {
-  const [sp, pr, ld, cm] = await Promise.all([sb.from('suppliers').select('*').eq('created_by', state.me.id).order('created_at', {ascending:false}),
+  const [sp, pr, ld, cm, aff] = await Promise.all([
+    sb.from('suppliers').select('*').eq('created_by', state.me.id).order('created_at', {ascending:false}),
     sb.from('products').select('*,suppliers(display_name)').eq('created_by', state.me.id).order('created_at', {ascending:false}),
-    sb.from('product_leads').select('*,products(title)').eq('ambassador_id', state.me.id).order('created_at', {ascending:false}).limit(60),
-    sb.from('commission_ledger').select('*').order('created_at', {ascending:false}).limit(50)]);
-  const S = sp.data || [], P = pr.data || [], L = ld.data || [], C = cm.data || [];
+    sb.from('product_leads').select('*,products(title)').eq('ambassador_id', state.me.id).order('created_at', {ascending:false}).limit(100),
+    sb.from('commission_ledger').select('*').eq('user_id', state.me.id).order('created_at', {ascending:false}).limit(100),
+    sb.from('product_leads').select('id,status,product_id,products(title,price)').eq('user_id', state.me.id).eq('kind','promote').order('created_at', {ascending:false}).limit(100)]);
+  const S = sp.data || [], P = pr.data || [], L = ld.data || [], C = cm.data || [], AFF = aff.data || [];
+  const affActive = AFF.filter(x => x.status === 'validated').length;
+  const affPending = AFF.filter(x => x.status === 'new').length;
+  const cmTotal = C.reduce((a, x) => a + (x.amount || 0), 0);
+
   app.innerHTML = `<a href="#/centrale">← La Centrale</a><h1>Mes fiches et produits</h1>
   <p class="mut">Tout membre peut créer des fiches fournisseurs et proposer des produits. Un produit est visible après validation par l’administration.</p>
-  <h2>Demandes reçues (${L.filter(x => x.status === 'new').length} à traiter)</h2>
-  ${L.map(x => `<div class="card" data-l="${x.id}"><b>${esc(x.products?.title)}</b> <span class="tag">${{contact:'Contact', buy:'Achat', promote:'Promotion'}[x.kind]}</span><span class="tag s">${{new:'En attente', validated:'Validée', refused:'Refusée'}[x.status]}</span>
-   <p class="mut who">…</p><p>${esc(x.message || '')}</p>${x.status === 'new' ? `<button data-d="validated" data-i="${x.id}">Valider</button><button class="bad" data-d="refused" data-i="${x.id}">Refuser</button>` : ''}</div>`).join('') || '<p class="card mut">Aucune demande.</p>'}
-  ${state.isAmbassador ? `<h2>Mes commissions</h2>${C.map(c => `<div class="card row"><span class="mut">${dt(c.created_at)} · 40 % de ${fcfa(c.base_amount)}</span><b>${fcfa(c.amount)}</b></div>`).join('') || '<p class="card mut">Aucune commission pour le moment.</p>'}<p class="mut">Les retraits ouvriront quand leurs règles seront définies.</p>` : ''}
-  <h2>Mes fiches fournisseurs</h2>${S.map(s => `<div class="card">${esc(s.display_name)} <span class="mut">${esc(s.category || '')} ${esc(s.city || '')}</span></div>`).join('') || '<p class="card mut">Aucune fiche.</p>'}
-  <form id="sf" class="card"><b>Nouvelle fiche fournisseur</b><label>Nom affiché (public, unique)<input name="display_name" required></label><label>Nom réel (privé)<input name="real_name"></label>
-  <label>Téléphone (privé)<input name="phone" type="tel"></label><label>WhatsApp (privé)<input name="whatsapp" type="tel"></label><label>Catégorie<input name="category"></label><label>Ville<input name="city"></label>
-  <button class="full">Créer la fiche</button></form>
-  <h2>Mes produits</h2>${P.map(x => `<div class="card"><b>${esc(x.title)}</b> <span class="tag s">${PST[x.status]}</span><br><span class="mut">${esc(x.suppliers?.display_name)} · ${fcfa(x.price)}</span>
-   ${x.status === 'rejected' && x.review_note ? `<p class="mut">Motif : ${esc(x.review_note)}</p>` : ''}
-   ${x.status === 'active' ? `<select data-a="${x.id}">${Object.entries(AVL).map(([v, l]) => `<option value="${v}" ${x.availability === v ? 'selected' : ''}>${l}</option>`).join('')}</select>` : ''}</div>`).join('') || '<p class="card mut">Aucun produit.</p>'}
-  <form id="pf" class="card"><b>Publier un produit</b><label>Fournisseur<select name="supplier_id" required>${S.map(s => `<option value="${s.id}">${esc(s.display_name)}</option>`).join('')}</select></label>
-  <label>Titre<input name="title" required></label><label>Description<textarea name="description" rows="3"></textarea></label><label>Catégorie<input name="category"></label>
-  <label>Prix (FCFA)<input name="price" type="number" min="0" required></label><label>Commission annoncée (FCFA)<input name="commission" type="number" min="0"></label>
-  <label>Disponibilité<select name="availability"><option value="unconfirmed">À confirmer</option><option value="in_stock">En stock</option><option value="limited">Stock limité</option><option value="out_of_stock">Rupture</option></select></label>
-  <button class="full">Envoyer pour validation</button><p class="mut">Le produit sera visible après validation par l’administration.</p></form>`;
+
+  <div class="grid3">
+    <div class="card stat"><b>${affActive}</b><span class="mut">Affiliations actives</span></div>
+    <div class="card stat"><b>${affPending}</b><span class="mut">Demandes en attente</span></div>
+    <div class="card stat"><b>${fcfa(cmTotal)}</b><span class="mut">Commissions cumulées</span></div>
+  </div>
+  <p class="mut" style="font-size:.8rem">Les commissions affichées proviennent de <code>commission_ledger</code>. Le suivi des ventes de produits n’est pas encore activé côté serveur.</p>
+
+  <h2>Demandes reçues sur mes produits (${L.filter(x => x.status === 'new').length} à traiter)</h2>
+  ${L.map(x => `<div class="card" data-l="${x.id}"><b>${esc(x.products?.title)}</b>
+    <span class="tag">${LKD[x.kind]}</span><span class="tag s">${LSD[x.status] || x.status}</span>
+    <p class="mut who">…</p><p>${esc(x.message || '')}</p>
+    ${x.status === 'new' ? `<button data-d="validated" data-i="${x.id}">Valider</button><button class="bad" data-d="refused" data-i="${x.id}">Refuser</button>` : ''}
+    </div>`).join('') || '<p class="card mut">Aucune demande reçue.</p>'}
+
+  ${state.isAmbassador ? `<h2>Mes commissions</h2>
+    ${C.map(c => `<div class="card row"><span class="mut">${dt(c.created_at)} · 40 % de ${fcfa(c.base_amount)}</span><b>${fcfa(c.amount)}</b></div>`).join('') || '<p class="card mut">Aucune commission pour le moment.</p>'}
+    <p class="mut">Les retraits ouvriront quand leurs règles seront définies.</p>` : ''}
+
+  <h2>Mes affiliations</h2>
+  ${AFF.map(x => `<a class="card row" href="#/product/${x.product_id}"><span>${esc(x.products?.title)}</span>
+    <span class="tag ${x.status === 'validated' ? '' : 's'}">${x.status === 'validated' ? 'Active' : x.status === 'new' ? 'En attente' : 'Refusée'}</span></a>`).join('') || '<p class="card mut">Aucune affiliation. Découvrez des produits dans La Centrale pour en demander.</p>'}
+  <p><a class="btn" href="#/centrale">Découvrir des produits</a></p>
+
+  <h2>Mes fiches fournisseurs</h2>
+  ${S.map(s => `<div class="card">${esc(s.display_name)} ${s.certified ? '<span class="tag">Certifié</span>' : ''}<br><span class="mut">${esc(s.category || '')} ${esc(s.city || '')}</span></div>`).join('') || '<p class="card mut">Aucune fiche.</p>'}
+
+  <form id="sf" class="card"><b>Nouvelle fiche fournisseur</b>
+    <label>Nom affiché (public, unique)<input name="display_name" required></label>
+    <label>Nom réel (privé)<input name="real_name"></label>
+    <label>Téléphone (privé)<input name="phone" type="tel"></label>
+    <label>WhatsApp (privé)<input name="whatsapp" type="tel"></label>
+    <label>Catégorie<input name="category"></label><label>Ville<input name="city"></label>
+    <button class="full">Créer la fiche</button></form>
+
+  <h2>Mes produits</h2>
+  ${P.map(x => `<div class="card"><b>${esc(x.title)}</b> <span class="tag s">${PST[x.status] || x.status}</span><br>
+    <span class="mut">${esc(x.suppliers?.display_name)} · ${fcfa(x.price)}${x.commission != null ? ' · commission ' + fcfa(x.commission) : ''}</span>
+    ${x.status === 'rejected' && x.review_note ? `<p class="mut">Motif : ${esc(x.review_note)}</p>` : ''}
+    ${x.status === 'active' ? `<select data-a="${x.id}">${Object.entries(AVL).map(([v, l]) => `<option value="${v}" ${x.availability === v ? 'selected' : ''}>${l}</option>`).join('')}</select>` : ''}
+    </div>`).join('') || '<p class="card mut">Aucun produit.</p>'}
+
+  <form id="pf" class="card"><b>Publier un produit</b>
+    <label>Fournisseur<select name="supplier_id" required>${S.map(s => `<option value="${s.id}">${esc(s.display_name)}</option>`).join('')}</select></label>
+    <label>Titre<input name="title" required></label><label>Description<textarea name="description" rows="3"></textarea></label>
+    <label>Catégorie<input name="category"></label>
+    <label>Prix (FCFA)<input name="price" type="number" min="0" required></label>
+    <label>Commission annoncée (FCFA)<input name="commission" type="number" min="0"></label>
+    <label>Disponibilité<select name="availability"><option value="unconfirmed">À confirmer</option><option value="in_stock">En stock</option><option value="limited">Stock limité</option><option value="out_of_stock">Rupture</option></select></label>
+    <button class="full">Envoyer pour validation</button>
+    <p class="mut">Le produit sera visible après validation par l’administration.</p></form>`;
+
   const go = async f => { try { await f(); seller(); } catch (_) {} };
-  L.forEach(async x => { const w = await sb.rpc('lead_requester', {p_lead_id:x.id}), d = w.data?.[0], el = app.querySelector(`[data-l="${x.id}"] .who`);
-    if (el) el.textContent = d ? `${d.full_name} · ${d.phone || ''} · ${d.city || ''}` : ''; });
-  app.querySelectorAll('[data-d]').forEach(b => b.onclick = () => { let note = null;
+
+  L.forEach(async x => {
+    const w = await sb.rpc('lead_requester', {p_lead_id:x.id}), d = w.data?.[0], el = app.querySelector(`[data-l="${x.id}"] .who`);
+    if (el) el.textContent = d ? `${d.full_name} · ${d.phone || ''} · ${d.city || ''}` : '';
+  });
+
+  app.querySelectorAll('[data-d]').forEach(b => b.onclick = () => {
+    let note = null;
     if (b.dataset.d === 'refused') { note = prompt('Motif du refus (facultatif) ?'); if (note === null) return; }
-    go(() => q(sb.rpc('decide_lead', {p_lead_id:b.dataset.i, p_decision:b.dataset.d, p_note:note}))); });
+    go(() => q(sb.rpc('decide_lead', {p_lead_id:b.dataset.i, p_decision:b.dataset.d, p_note:note})));
+  });
   app.querySelectorAll('[data-a]').forEach(s => s.onchange = () => go(() => q(sb.rpc('ambassador_set_availability', {p_product_id:s.dataset.a, p_availability:s.value}))));
+
   document.getElementById('sf').onsubmit = e => { e.preventDefault(); const f = Object.fromEntries(new FormData(e.target));
-    go(async () => { const x = await sb.from('suppliers').insert({display_name:f.display_name.trim(), category:f.category.trim() || null, city:f.city.trim() || null}).select('id').single();
+    go(async () => {
+      const x = await sb.from('suppliers').insert({display_name:f.display_name.trim(), category:f.category.trim() || null, city:f.city.trim() || null}).select('id').single();
       if (x.error) { toast(x.error.code === '23505' ? 'Ce nom de fiche existe déjà : choisissez-en un autre.' : x.error.message); throw x.error; }
       if (f.real_name || f.phone || f.whatsapp) await q(sb.from('supplier_private').insert({supplier_id:x.data.id, real_name:f.real_name.trim() || null, phone:f.phone.trim() || null, whatsapp:f.whatsapp.trim() || null}));
-      toast('Fiche créée.'); }); };
+      toast('Fiche créée.');
+    }); };
+
   document.getElementById('pf').onsubmit = e => { e.preventDefault(); const f = Object.fromEntries(new FormData(e.target));
-    go(async () => { await q(sb.from('products').insert({supplier_id:f.supplier_id, title:f.title.trim(), description:f.description.trim(), category:f.category.trim() || null,
-      price:Number(f.price), commission:f.commission === '' ? null : Number(f.commission), availability:f.availability, status:'pending'})); toast('Produit envoyé pour validation.'); }); };
+    go(async () => {
+      await q(sb.from('products').insert({supplier_id:f.supplier_id, title:f.title.trim(), description:f.description.trim(), category:f.category.trim() || null,
+        price:Number(f.price), commission:f.commission === '' ? null : Number(f.commission), availability:f.availability, status:'pending'}));
+      toast('Produit envoyé pour validation.');
+    }); };
 }
 
 // ===== src/main.js =====
