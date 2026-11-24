@@ -199,72 +199,125 @@ function authView(onDone,mode='login'){
 // ===== src/pages/home.js =====
 const by = rows => (rows || []).reduce((a, x) => (a[x.status] = (a[x.status] || 0) + 1, a), {});
 const total = c => Object.values(c).reduce((a, b) => a + b, 0);
-const statusText = c => [['approved', 'validée(s)'], ['pending', 'en attente'], ['rejected', 'refusée(s)'], ['expired', 'expirée(s)']].filter(([k]) => c[k]).map(([k, l]) => c[k] + ' ' + l).join(' · ') || 'Aucune';
+const statusText = c => [['approved', 'validée(s)'], ['pending', 'en attente'], ['rejected', 'refusée(s)'], ['expired', 'expirée(s)']]
+  .filter(([k]) => c[k]).map(([k, l]) => c[k] + ' ' + l).join(' · ') || 'Aucune';
 
 async function home() {
   const me = state.me.id, now = new Date().toISOString();
   const cnt = (t, f) => { const x = sb.from(t).select('*', {count:'exact', head:true}); return f ? f(x) : x; };
   const pend = t => state.isAdmin ? cnt(t, x => x.eq('status', 'pending')) : {count:0};
   const opp = (t, cols, owner) => sb.from(t).select(cols).eq('status', t === 'products' ? 'active' : 'approved').neq(owner, me).order('created_at', {ascending:false}).limit(3);
-  const live = t => t === 'products' ? opp(t, 'id,title,category,price,created_at', 'created_by') : opp(t, 'id,title,category,city,created_at,expires_at', 'user_id').gt('expires_at', now);
+  const live = t => t === 'products' ? opp(t, 'id,title,category,price,created_at', 'created_by')
+    : opp(t, 'id,title,category,city,created_at,expires_at', 'user_id').gt('expires_at', now);
   const mine = t => sb.from(t).select('status').eq('user_id', me).limit(300);
   const [d, nt, pf, o1, o2, o3, mo, ms, mp, mt, mpr, aff, vl, a1, a2, a3, a4, a5, a6] = await Promise.all([
     q(sb.rpc('member_dashboard')), sb.from('notifications').select('*').order('created_at', {ascending:false}).limit(3),
     sb.from('profiles').select('full_name').eq('id', me).maybeSingle(), live('offers'), live('searches'), live('products'),
-    mine('offers'), mine('searches'), mine('properties'), mine('transport_requests'), sb.from('products').select('status').eq('created_by', me).limit(300),
+    mine('offers'), mine('searches'), mine('properties'), mine('transport_requests'),
+    sb.from('products').select('status').eq('created_by', me).limit(300),
     sb.from('product_leads').select('id,status,product_id,products(title)').eq('user_id', me).eq('kind', 'promote').order('created_at', {ascending:false}).limit(50),
     cnt('product_leads', x => x.eq('user_id', me).eq('status', 'validated')),
     pend('offers'), pend('searches'), pend('properties'), pend('transport_requests'), pend('products'), pend('withdrawal_requests')]);
 
   const name = String(pf.data?.full_name || '').split(' ')[0];
-  // --- 2. Opportunités : 3 au maximum, issues des données réelles et visibles (aucune recommandation inventée)
-  const pool = [...(o1.data || []).map(x => ({...x, k:'Offre', h:'#/p/offer/', i:[x.category, x.city]})), ...(o2.data || []).map(x => ({...x, k:'Recherche', h:'#/p/search/', i:[x.category, x.city]})),
-    ...(o3.data || []).map(x => ({...x, k:'Produit', h:'#/product/', i:[x.category, fcfa(x.price)]}))].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+  // --- 2. Opportunités : 3 max, 1 par type puis complétées, toutes réelles et visibles
+  const pool = [
+    ...(o1.data || []).map(x => ({...x, k:'Offre', h:'#/p/offer/', i:[x.category, x.city]})),
+    ...(o2.data || []).map(x => ({...x, k:'Recherche', h:'#/p/search/', i:[x.category, x.city]})),
+    ...(o3.data || []).map(x => ({...x, k:'Produit', h:'#/product/', i:[x.category, fcfa(x.price)]}))
+  ].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
   const picked = [], seen = new Set();
   pool.forEach(x => { if (picked.length < 3 && !seen.has(x.k)) { seen.add(x.k); picked.push(x); } });
   pool.forEach(x => { if (picked.length < 3 && !picked.includes(x)) picked.push(x); });
+
   // --- 3. Activités : registre extensible (un module = une ligne)
   const co = by(mo.data), cs = by(ms.data), cp = by(mp.data), ct = by(mt.data), cpr = by(mpr.data);
   const A = aff.data || [], affActive = A.filter(x => x.status === 'validated'), affPending = A.filter(x => x.status === 'new').length;
   const ACT = [
-    {l:'Offres', href:'#/activity/pub', v:total(co), s:statusText(co)}, {l:'Recherches', href:'#/activity/pub', v:total(cs), s:statusText(cs)},
-    total(cp) && {l:'Immobilier', href:'#/activity/pub', v:total(cp), s:statusText(cp)}, total(ct) && {l:'Transport', href:'#/activity/pub', v:total(ct), s:statusText(ct)},
+    {l:'Offres', href:'#/activity/pub', v:total(co), s:statusText(co)},
+    {l:'Recherches', href:'#/activity/pub', v:total(cs), s:statusText(cs)},
+    total(cp) && {l:'Immobilier', href:'#/activity/pub', v:total(cp), s:statusText(cp)},
+    total(ct) && {l:'Transport', href:'#/activity/pub', v:total(ct), s:statusText(ct)},
     total(cpr) && {l:'Produits proposés', href:'#/seller', v:total(cpr), s:statusText(cpr)},
-    {l:'Affiliations actives', href:'#/activity/affil', v:affActive.length, s:(affActive.slice(0, 2).map(x => esc(x.products?.title)).join(', ') || 'Aucune') + (affPending ? ` · ${affPending} en attente` : '') + '<br>Ventes et commissions : suivi non activé'},
-    {l:'DropAds', href:'#/m/dropads', v:'—', s:'Module non ouvert : le suivi des campagnes arrivera avec lui'}].filter(Boolean);
+    {l:'Affiliations actives', href:'#/activity/affil', v:affActive.length,
+     s: affActive.length
+        ? `${affActive.slice(0,2).map(x => esc(x.products?.title)).join(', ')}${affPending ? ` · ${affPending} en attente` : ''}`
+        : (affPending ? `${affPending} demande(s) en attente` : 'Aucune affiliation active')},
+    {l:'DropAds', href:'#/m/dropads', v:'—', s:'Module en préparation : suivi des campagnes à venir'}
+  ].filter(Boolean);
+
   // --- 4. Progression : uniquement des faits enregistrés
   const pubTotal = total(co) + total(cs) + total(cp) + total(ct);
+
   // --- 6. Priorités : uniquement des actions réelles
   const adm = (a1.count || 0) + (a2.count || 0) + (a3.count || 0) + (a4.count || 0);
-  const TODO = [[d.requests_pending, 'demande(s) de mise en relation à traiter', '#/activity/requests'], [d.leads_pending, 'demande(s) sur vos produits', '#/seller'],
-    [(co.rejected || 0) + (cs.rejected || 0) + (cp.rejected || 0) + (ct.rejected || 0), 'publication(s) refusée(s) à corriger', '#/activity/pub'], [cpr.rejected || 0, 'produit(s) refusé(s) à corriger', '#/seller'],
-    [state.isAdmin && adm, 'publication(s) à valider', '#/admin'], [state.isAdmin && a5.count, 'produit(s) à valider', '#/admin/centrale'], [state.isAdmin && a6.count, 'retrait(s) à traiter', '#/admin']].filter(x => x[0] > 0);
-  const QA = [['plus', 'Publier une offre', '#/publish'], ['file', 'Publier une recherche', '#/publish/search'], ['community', 'Communauté', '#/community'], ['store', 'La Centrale', '#/centrale'],
-    ['link', 'Mes affiliations', '#/activity/affil'], ['contacts', 'Mes contacts', '#/contacts'], ['wallet', 'Mon portefeuille', '#/wallet'],
-    ...MODULES.filter(m => m.status === 'ready' && ['immobilier', 'transport'].includes(m.id)).map(m => [m.icon, m.name, '#/' + m.id])];
+  const TODO = [
+    [d.requests_pending, 'demande(s) de mise en relation à traiter (dans Activité)', '#/activity/requests'],
+    [d.leads_pending, 'demande(s) sur vos produits', '#/seller'],
+    [(co.rejected || 0) + (cs.rejected || 0) + (cp.rejected || 0) + (ct.rejected || 0), 'publication(s) refusée(s) à corriger', '#/activity/pub'],
+    [cpr.rejected || 0, 'produit(s) refusé(s) à corriger', '#/seller'],
+    [state.isAdmin && adm, 'publication(s) à valider', '#/admin'],
+    [state.isAdmin && a5.count, 'produit(s) à valider', '#/admin/centrale'],
+    [state.isAdmin && a6.count, 'retrait(s) à traiter', '#/admin']
+  ].filter(x => x[0] > 0);
 
-  app.innerHTML = `<p class="hello">Bonjour${name ? ', ' + esc(name) : ''} 👋</p>${d.notifications_unread > 0 ? `<p class="mut" style="margin-top:-6px"><a href="#/notifications">${d.notifications_unread} notification(s) non lue(s)</a></p>` : ''}
+  const QA = [
+    ['compass', 'Toutes les opportunités', '#/opportunities'],
+    ['plus', 'Publier une offre', '#/publish'],
+    ['file', 'Publier une recherche', '#/publish/search'],
+    ['community', 'Communauté', '#/community'],
+    ['store', 'La Centrale', '#/centrale'],
+    ['link', 'Mes affiliations', '#/activity/affil'],
+    ['contacts', 'Mes contacts', '#/contacts'],
+    ['wallet', 'Mon portefeuille', '#/wallet'],
+    ...MODULES.filter(m => m.status === 'ready' && ['immobilier','transport'].includes(m.id)).map(m => [m.icon, m.name, '#/' + m.id])
+  ];
 
+  app.innerHTML = `
+  <!-- 1. Bienvenue -->
+  <p class="hello">Bonjour${name ? ', ' + esc(name) : ''} 👋</p>
+  ${d.notifications_unread > 0 ? `<p class="mut" style="margin-top:-6px"><a href="#/notifications">${d.notifications_unread} notification(s) non lue(s)</a></p>` : ''}
+
+  <!-- 2. Opportunités à saisir -->
   <h2>Opportunités à saisir</h2>
   ${picked.map(x => `<a class="card" href="${x.h}${x.id}"><span class="tag${x.k === 'Recherche' ? ' s' : ''}">${x.k}</span><b>${esc(x.title)}</b><br><span class="mut">${x.i.filter(Boolean).map(esc).join(' · ') || 'Voir le détail'}</span></a>`).join('') || '<p class="card mut">Aucune opportunité disponible pour le moment.</p>'}
-  <p><a class="btn alt" href="#/community">Voir la Communauté</a><a class="btn alt" href="#/centrale">Voir La Centrale</a></p>
+  <p><a class="btn alt" href="#/opportunities">Toutes les opportunités</a><a class="btn alt" href="#/community">Communauté</a><a class="btn alt" href="#/centrale">La Centrale</a></p>
 
-  <h2>Mes activités</h2><div class="grid">${ACT.map(a => `<a class="card stat" href="${a.href}"><b>${a.v}</b><span class="mut">${a.l}</span><br><span class="mut" style="font-size:.78rem">${a.s}</span></a>`).join('')}</div>
+  <!-- 3. Mes activités -->
+  <h2>Mes activités</h2>
+  <div class="grid">${ACT.map(a => `<a class="card stat" href="${a.href}"><b>${a.v}</b><span class="mut">${a.l}</span><br><span class="mut" style="font-size:.78rem">${a.s}</span></a>`).join('')}</div>
 
-  <h2>Ma progression</h2><div class="grid3">
-   <div class="card dim"><div class="ico">${icon('briefcase')}</div><b>Activité</b><p class="mut">${pubTotal} publication(s)<br>${total(cpr)} produit(s) proposé(s)<br>${affActive.length} affiliation(s) active(s)</p></div>
-   <div class="card dim r"><div class="ico">${icon('contacts')}</div><b>Relations</b><p class="mut">${d.contacts} mise(s) en relation établie(s)<br>${vl.count || 0} contact(s) fournisseur obtenu(s)<br><i>Les demandes en attente ne sont pas comptées.</i></p></div>
-   <div class="card dim g"><div class="ico">${icon('trend')}</div><b>Résultats</b><p class="mut">${fcfa(d.gains_total)} de commissions validées<br>Ventes confirmées : suivi non activé<br><i>Les revenus en attente ne sont pas comptés.</i></p></div></div>
+  <!-- 4. Ma progression -->
+  <h2>Ma progression</h2>
+  <div class="grid3">
+    <div class="card dim"><div class="ico">${icon('briefcase')}</div><b>Activité</b>
+      <p class="mut">${pubTotal} publication(s)<br>${total(cpr)} produit(s) proposé(s)<br>${affActive.length} affiliation(s) active(s)</p></div>
+    <div class="card dim r"><div class="ico">${icon('contacts')}</div><b>Relations</b>
+      <p class="mut">${d.contacts} mise(s) en relation établie(s)<br>${vl.count || 0} contact(s) fournisseur obtenu(s)<br><i>Les demandes en attente ne sont pas comptées.</i></p></div>
+    <div class="card dim g"><div class="ico">${icon('trend')}</div><b>Résultats</b>
+      <p class="mut">${fcfa(d.gains_total)} de commissions validées<br>Ventes confirmées : suivi non activé<br><i>Les revenus en attente ne sont pas comptés.</i></p>
+      <a class="mut" href="#/evolution" style="font-size:.78rem">Voir mon évolution →</a></div>
+  </div>
 
-  <h2>Mes revenus</h2><div class="card hero"><small>Revenus disponibles</small><b>${fcfa(d.withdrawable)}</b><div class="row"><small>Validés et retirables</small><a class="pill" href="#/wallet">Retirer</a></div></div>
-  <div class="grid3"><div class="card stat"><b>${fcfa(d.gains_pending)}</b><span class="mut">Revenus en attente</span></div><div class="card stat"><b>${fcfa(d.gains_total)}</b><span class="mut">Revenus cumulés</span></div>
-   <div class="card stat"><b>${fcfa(d.spent_total)}</b><span class="mut">Dépenses cumulées</span></div></div>
+  <!-- 5. Mes revenus -->
+  <h2>Mes revenus</h2>
+  <div class="card hero"><small>Revenus disponibles</small><b>${fcfa(d.withdrawable)}</b>
+    <div class="row"><small>Validés et retirables</small><a class="pill" href="#/wallet">Retirer</a></div></div>
+  <div class="grid3">
+    <div class="card stat"><b>${fcfa(d.gains_pending)}</b><span class="mut">Revenus en attente</span></div>
+    <div class="card stat"><b>${fcfa(d.gains_total)}</b><span class="mut">Revenus cumulés</span></div>
+    <div class="card stat"><b>${fcfa(d.spent_total)}</b><span class="mut">Dépenses cumulées</span></div></div>
   <p><a class="btn" href="#/wallet">Ouvrir mon portefeuille</a><span class="mut">Opérations, historique, paiements et retraits</span></p>
 
-  <h2>Actions et actualités</h2><div class="sub">Mes priorités</div>
+  <!-- 6. Actions et actualités -->
+  <h2>Actions et actualités</h2>
+  <div class="sub">Mes priorités</div>
   ${TODO.map(([n, l, h]) => `<a class="card row" href="${h}"><span><b>${n}</b> ${l}</span><span class="tag">Traiter</span></a>`).join('') || '<p class="card mut">Aucune action en attente.</p>'}
-  <div class="sub">Actions rapides</div><div class="grid">${QA.map(([i, l, h]) => `<a class="action" href="${h}"><span class="ico">${icon(i)}</span>${l}</a>`).join('')}</div>
-  <div class="sub">Activité récente</div>${(nt.data || []).map(n => `<div class="card ${n.is_read ? '' : 'unread'}"><b>${esc(n.title)}</b><br><span class="mut">${esc(n.message || '')}</span></div>`).join('') || '<p class="card mut">Aucune activité récente.</p>'}
+  <div class="sub">Actions rapides</div>
+  <div class="grid">${QA.map(([i, l, h]) => `<a class="action" href="${h}"><span class="ico">${icon(i)}</span>${l}</a>`).join('')}</div>
+  <div class="sub">Activité récente</div>
+  ${(nt.data || []).map(n => `<div class="card ${n.is_read ? '' : 'unread'}"><b>${esc(n.title)}</b><br><span class="mut">${esc(n.message || '')}</span></div>`).join('') || '<p class="card mut">Aucune activité récente.</p>'}
   <p><a href="#/notifications">Voir tout l’historique</a></p>`;
 }
 
