@@ -11,7 +11,7 @@
 <script>
 window.addEventListener('error',e=>{document.body.insertAdjacentHTML('afterbegin','<pre style="padding:12px;color:#b00;white-space:pre-wrap">Erreur : '+e.message+'</pre>')});
 </script>
- <style>
+<style>
 :root{color-scheme:light dark;--bg:#F3F5FB;--surface:#fff;--ink:#0B1530;--mut:#66728A;--line:#E4E9F4;--brand:#2455F4;--brand2:#5B7CFF;--tint:#E8EEFF;--sun:#FFB020;--bad:#D92D3A;--g:var(--brand);--sh:0 1px 2px rgba(11,21,48,.05),0 10px 28px rgba(11,21,48,.07)}
 @media(prefers-color-scheme:dark){:root{--bg:#0A0F1F;--surface:#121A33;--ink:#EEF2FF;--mut:#97A3C2;--line:#1F2A4A;--tint:#1A2650;--brand:#5B7CFF;--sh:0 1px 2px rgba(0,0,0,.4)}}
 *{box-sizing:border-box}
@@ -77,7 +77,7 @@ nav a.x{display:none}
 .dim{border-top:4px solid var(--brand)}.dim.r{border-top-color:var(--sun)}.dim.g{border-top-color:#12A150}
 .dim p{margin:6px 0 0}
 
-/* ===== CENTRALE (ajout) ===== */
+/* ===== CENTRALE ===== */
 .ct-banner{display:flex;align-items:center;gap:8px;padding:8px 12px;border-radius:12px;background:#FFF6DD;color:#7A5300;font-size:.78rem;font-weight:700;margin:0 0 12px;border:1px solid #FFE4A3}
 @media(prefers-color-scheme:dark){.ct-banner{background:#2A2210;color:#FFD98A;border-color:#4A3B12}}
 .ct-banner svg{width:16px;height:16px;flex:none}
@@ -94,8 +94,8 @@ nav a.x{display:none}
 .ct-card .ct-body{padding:10px 12px 12px;display:flex;flex-direction:column;gap:6px;flex:1}
 .ct-card .ct-name{font-weight:800;font-size:.92rem;line-height:1.25;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .ct-card .ct-price{font-weight:800;font-size:.98rem;font-variant-numeric:tabular-nums}
-.ct-card .ct-com{font-size:.78rem;font-weight:700;color:#8A5A00}
-@media(prefers-color-scheme:dark){.ct-card .ct-com{color:#FFD98A}}
+.ct-card .ct-com,.ct-com{font-size:.78rem;font-weight:700;color:#8A5A00}
+@media(prefers-color-scheme:dark){.ct-card .ct-com,.ct-com{color:#FFD98A}}
 .ct-badges{display:flex;gap:6px;flex-wrap:wrap}
 .ct-cert{background:#E7F7EE;color:#0E6B3A}
 @media(prefers-color-scheme:dark){.ct-cert{background:#0E2E1C;color:#8FE7B8}}
@@ -106,10 +106,6 @@ nav a.x{display:none}
 .ct-skel{aspect-ratio:3/4;border-radius:18px;background:linear-gradient(100deg,var(--line) 20%,color-mix(in srgb,var(--line) 60%,var(--surface)) 40%,var(--line) 60%);background-size:200% 100%;animation:ct-shimmer 1.2s infinite}
 @keyframes ct-shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
 @media(prefers-reduced-motion:reduce){.ct-skel{animation:none}}
-.ct-sect{display:flex;justify-content:space-between;align-items:baseline;margin:20px 0 8px}
-.ct-sect h2{margin:0}
-.ct-sect a{font-size:.85rem;font-weight:700;text-decoration:none}
-/* ===== FIN CENTRALE (ajout) ===== */
 </style>
 </head>
 <body>
@@ -161,7 +157,6 @@ const P = {
   building:'<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M9 8h.01M15 8h.01M9 12h.01M15 12h.01M10 21v-4h4v4"/>',
   truck:'<path d="M1 6h13v11H1z"/><path d="M14 10h4l3 3v4h-7"/><circle cx="6" cy="18" r="2"/><circle cx="17" cy="18" r="2"/>',
   megaphone:'<path d="M3 11v2a1 1 0 0 0 1 1h3l8 4V6L7 10H4a1 1 0 0 0-1 1z"/><path d="M19 8a5 5 0 0 1 0 8"/>',
-  spark:'<path d="M12 3l2 5 5 2-5 2-2 5-2-5-5-2 5-2z"/>',
   compass:'<circle cx="12" cy="12" r="9"/><path d="M15.5 8.5l-2 5-5 2 2-5z"/>',
   briefcase:'<rect x="3" y="7" width="18" height="13" rx="2"/><path d="M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/>',
   wallet:'<path d="M3 7a2 2 0 0 1 2-2h13v4"/><path d="M3 7v11a2 2 0 0 0 2 2h14v-4"/><path d="M21 12h-4a2 2 0 0 0 0 4h4z"/>',
@@ -170,11 +165,8 @@ const P = {
   plus:'<circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/>',
   link:'<path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/>',
   file:'<path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/>',
-  out:'<path d="M7 17L17 7M8 7h9v9"/>',
-  search:'<circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/>',
   info:'<circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v5h1"/>'};
 const icon = n => `<svg viewBox="0 0 24 24" aria-hidden="true">${P[n] || ''}</svg>`;
-// Entrée La Centrale discrète : visible uniquement >= 900px (flag x)
 const TABS = [['#/','Accueil','home'],['#/opportunities','Opportunités','compass'],['#/activity','Activité','briefcase'],['#/wallet','Portefeuille','wallet'],
   ['#/centrale','La Centrale','store',1],
   ['#/contacts','Relations','contacts',1],['#/evolution','Évolution','trend',1],['#/notifications','Notifications','bell',1],['#/profile','Profil','profile']];
@@ -182,7 +174,8 @@ const ON = {
   '#/': h => h === '#/' || h.startsWith('#/m/'),
   '#/opportunities': h => /^#\/(opportunities|community|centrale|immobilier|transport|product|p\/|publish|seller)/.test(h),
   '#/activity': h => h.startsWith('#/activity'), '#/wallet': h => h === '#/wallet', '#/contacts': h => h === '#/contacts',
-  '#/evolution': h => h === '#/evolution', '#/notifications': h => h === '#/notifications', '#/profile': h => /^#\/(profile|admin)/.test(h)};
+  '#/evolution': h => h === '#/evolution', '#/notifications': h => h === '#/notifications', '#/profile': h => /^#\/(profile|admin)/.test(h),
+  '#/centrale': h => h.startsWith('#/centrale')};
 function setNav() {
   const h = location.hash || '#/'; nav.hidden = false;
   nav.innerHTML = TABS.map(([u, l, i, x]) => { const on = ON[u](h);
@@ -205,16 +198,18 @@ async function q(p) {
   }
   return r.data;
 }
-// ===== Écrans pas encore présents dans ce fichier =====
+
+// ===== Écrans pas encore disponibles =====
 function comingSoon(title, back = '#/') {
   app.innerHTML = `<a href="${back}">← Retour</a><h1>${esc(title)}</h1>
   <div class="card"><span class="tag s">En préparation</span><p class="mut">Cet écran sera activé prochainement.</p></div>`;
 }
-function product()  { comingSoon('Produit', '#/centrale'); }
+function product() { comingSoon('Produit', '#/centrale'); }
 function immobilier() { comingSoon('Immobilier', '#/opportunities'); }
-function transport()  { comingSoon('Transport', '#/opportunities'); }
-function seller()     { comingSoon('Mes fiches et produits', '#/profile'); }
+function transport() { comingSoon('Transport', '#/opportunities'); }
+function seller() { comingSoon('Mes fiches et produits', '#/profile'); }
 function adminCentrale() { comingSoon('Administration La Centrale', '#/admin'); }
+
 // ===== src/services/auth.js =====
 async function loadSession() {
   const {data} = await sb.auth.getSession(); const user = data.session?.user || null; let admin = false, amb = false;
@@ -242,9 +237,7 @@ function authView(onDone,mode='login'){
     }catch(_){}};
 }
 
-// ===== src/pages/home.js =====
-  
-// ===== src/pages/home.js =====
+// ===== src/pages/home.js (allégé) =====
 const by = rows => (rows || []).reduce((a, x) => (a[x.status] = (a[x.status] || 0) + 1, a), {});
 const total = c => Object.values(c).reduce((a, b) => a + b, 0);
 
@@ -318,13 +311,88 @@ async function home() {
   <h2>Accès rapide</h2>
   <div class="grid">${QA.map(([i, l, h]) => `<a class="action" href="${h}"><span class="ico">${icon(i)}</span>${l}</a>`).join('')}</div>`;
 }
+
+// ===== src/pages/community.js =====
+const SKIND = {product:['La Centrale','#/product/'], property:['Immobilier','#/p/property/'], transport:['Transport','#/p/transport/'], offer:['Communauté','#/p/offer/']};
+async function community() {
+  const feed = t => sb.from(t).select('*').eq('status', 'approved').order('created_at', {ascending:false}).limit(30);
+  const mine = t => sb.from(t).select('id,title,status,expires_at').eq('user_id', state.me.id).order('created_at', {ascending:false}).limit(20);
+  const [o, s, mo, ms] = await Promise.all([feed('offers'), feed('searches'), mine('offers'), mine('searches')]);
+  const tab = state.feedTab, list = (tab === 'offer' ? o : s).data || [];
+  const my = [...(mo.data || []).map(x => ({...x, k:'offer'})), ...(ms.data || []).map(x => ({...x, k:'search'}))];
+  app.innerHTML = `<div class="row"><h1>Communauté</h1><a class="btn" href="#/publish">Publier</a></div>
+  <form id="sf" class="card"><input id="sq" type="search" minlength="2" maxlength="80" required placeholder="Que cherchez-vous ? Produit, bien, transport, service…"><button class="full">Rechercher</button></form>
+  <div id="res"></div><div id="feed">
+  <div><button class="${tab === 'offer' ? '' : 'alt'}" data-t="offer">Offres</button><button class="${tab === 'search' ? '' : 'alt'}" data-t="search">Recherches</button></div>
+  ${list.map(r => `<a class="card" href="#/p/${tab}/${r.id}"><b>${esc(r.title)}</b><br><span class="tag">${esc(r.category || 'Général')}</span><span class="mut">${esc(r.city || '')}</span>
+   <p class="mut" style="margin:6px 0 0">${esc(r.description).slice(0, 110)}</p></a>`).join('') || '<p class="card mut">Aucune publication validée pour le moment. Publiez la première.</p>'}
+  <h2>Mes publications</h2>${my.map(x => `<a class="card row" href="#/p/${x.k}/${x.id}"><span>${esc(x.title)}</span><span class="tag s">${esc(STATUS[x.status] || x.status)}</span></a>`).join('') || '<p class="card mut">Vous n’avez rien publié.</p>'}</div>`;
+  app.querySelectorAll('[data-t]').forEach(b => b.onclick = () => { state.feedTab = b.dataset.t; community(); });
+  document.getElementById('sf').onsubmit = async e => { e.preventDefault();
+    const t = document.getElementById('sq').value.trim(), res = document.getElementById('res'), fd = document.getElementById('feed');
+    res.innerHTML = '<p class="card mut" aria-busy="true">Recherche…</p>'; fd.hidden = true;
+    try {
+      const rows = await q(sb.rpc('search_network', {p_q:t}));
+      if (!rows.length) res.innerHTML = `<div class="card"><b>Rien ne correspond à « ${esc(t)} ».</b>
+        <p class="mut">Ni La Centrale, ni Immobilier, ni Transport, ni la Communauté ne répondent à ce besoin pour le moment. Publiez une recherche : le réseau pourra vous répondre.</p>
+        <a class="btn full" href="#/publish/search/${encodeURIComponent(t)}">Créer une recherche</a></div><button class="alt full" id="clr">Effacer la recherche</button>`;
+      else res.innerHTML = Object.keys(SKIND).filter(k => rows.some(r => r.kind === k)).map(k => `<h2>${SKIND[k][0]}</h2>` +
+        rows.filter(r => r.kind === k).map(r => `<a class="card" href="${SKIND[k][1]}${r.id}"><b>${esc(r.title)}</b><br><span class="tag">${esc(r.subtitle)}</span>
+        ${r.price != null ? `<b>${fcfa(r.price)}</b> ` : ''}<span class="mut">${esc(r.city || '')}</span></a>`).join('')).join('') + '<button class="alt full" id="clr">Effacer la recherche</button>';
+      document.getElementById('clr').onclick = () => community();
+    } catch (_) { res.innerHTML = ''; fd.hidden = false; }
+  };
+}
+
+// ===== src/pages/publish.js =====
+function publish(kind,txt){
+  let forced=false;
+  app.innerHTML=`<h1>Publier</h1><form id="f" class="card"><label>Type<select id="t"><option value="offer">Je propose (offre, service)</option><option value="search">Je cherche (fournisseur, prestataire)</option></select></label>
+  <label>Titre<input id="ti" required maxlength="120"></label><label>Description<textarea id="d" rows="5" required></textarea></label>
+  <label>Catégorie<input id="c" placeholder="Électroménager, transport…"></label><label>Ville<input id="v" placeholder="Ouagadougou"></label>
+  <button class="full">Envoyer pour validation</button>
+  <p class="mut">Pas d’annonce immobilière, de produit pour La Centrale ni de recherche d’emploi. Une fois validée, la publication reste visible 2 jours.</p></form>`;
+  if(kind==='search')document.getElementById('t').value='search';if(txt)document.getElementById('ti').value=decodeURIComponent(txt);
+  document.getElementById('f').onsubmit=async e=>{e.preventDefault();
+    if(document.getElementById('t').value==='search'&&!forced){
+      const r=await sb.rpc('search_network',{p_q:document.getElementById('ti').value.trim()}),m=(r.data||[]).filter(x=>x.kind==='product');
+      if(m.length){let box=document.getElementById('mt');if(!box){box=document.createElement('div');box.id='mt';document.getElementById('f').before(box)}
+        box.innerHTML=`<div class="card"><b>La Centrale a peut-être ce que vous cherchez</b>${m.slice(0,5).map(x=>`<a class="card" href="#/product/${x.id}"><b>${esc(x.title)}</b><br><span class="mut">${esc(x.subtitle)}</span> <b>${fcfa(x.price)}</b></a>`).join('')}
+        <p class="mut">Si aucun produit ne convient, publiez quand même : l’équipe examinera votre recherche.</p><button type="button" id="go">Publier quand même</button></div>`;
+        document.getElementById('go').onclick=()=>{forced=true;document.getElementById('f').requestSubmit()};return}}
+    try{await q(sb.from(t.value==='offer'?'offers':'searches').insert({user_id:state.me.id,title:ti.value.trim(),description:d.value.trim(),category:c.value.trim()||null,city:v.value.trim()||null}));
+    toast('Publication envoyée : en attente de validation.');location.hash='#/'}catch(_){}};
+}
+
+// ===== src/pages/detail.js =====
+const TBL = {offer:'offers', search:'searches', property:'properties', transport:'transport_requests'};
+const LBL = {offer:'Offre', search:'Recherche', property:'Immobilier', transport:'Transport'};
+const BACK = {offer:'#/community', search:'#/community', property:'#/immobilier', transport:'#/transport'};
+async function detail(type, id) {
+  if (!TBL[type]) throw new Error('type');
+  const r = await q(sb.from(TBL[type]).select('*').eq('id', id).single());
+  const mine = r.user_id === state.me.id;
+  const facts = [r.category, r.property_type && (r.operation + ' · ' + r.property_type), r.kind && (r.direction + ' · ' + r.kind),
+    r.price != null && fcfa(r.price), r.origin && r.destination && (r.origin + ' → ' + r.destination), r.travel_date && ('Date : ' + r.travel_date), r.city, r.district].filter(Boolean);
+  app.innerHTML = `<a href="${BACK[type]}">← Retour</a><h1>${esc(r.title)}</h1>
+  <p><span class="tag${type === 'search' ? ' s' : ''}">${LBL[type]}</span>${facts.map(f => `<span class="tag">${esc(f)}</span>`).join('')}</p>
+  <div class="card">${esc(r.description).replace(/\n/g, '<br>')}</div>
+  <p class="mut">Visible jusqu’au ${dt(r.expires_at)}${mine ? ' · Statut : ' + esc(r.status) : ''}</p>
+  ${mine ? '<p class="card">Ceci est votre publication.</p>' : `<form id="cr" class="card"><label>Message (facultatif)<textarea id="m" rows="3"></textarea></label>
+  <button class="full">Demander une mise en relation</button>
+  <p class="mut">Vous ne payez rien. Les coordonnées sont partagées si l’auteur accepte.</p></form>`}`;
+  if (!mine) document.getElementById('cr').onsubmit = async e => { e.preventDefault();
+    try { await q(sb.from('contact_requests').insert({requester_id:state.me.id, recipient_id:r.user_id, source_type:type, source_id:id, message:document.getElementById('m').value.trim() || null}));
+      toast('Demande envoyée.'); location.hash = '#/activity'; } catch (_) {} };
+}
+
 // ===== src/pages/contacts.js =====
 async function contacts(){
   const cs=await q(sb.from('contacts').select('*').order('created_at',{ascending:false}));
   const rows=await Promise.all(cs.map(async c=>{const o=c.user_a===state.me.id?c.user_b:c.user_a;
     const {data}=await sb.rpc('get_contact_details',{p_user_id:o});return data?.[0]}));
   app.innerHTML=`<h1>Contacts</h1>`+(rows.filter(Boolean).map(r=>`<div class="card"><b>${esc(r.full_name)}</b> <span class="mut">${esc(r.professional_title||'')} ${esc(r.city||'')}</span><br>
-   <a class="btn" href="tel:${esc(r.phone)}">Appeler</a><a class="btn alt" style="background:#fff;color:var(--g);border:1px solid var(--g)" href="https://wa.me/${esc(String(r.phone).replace(/\D/g,''))}">WhatsApp</a></div>`).join('')||'<p class="card mut">Vos mises en relation validées apparaîtront ici avec les coordonnées.</p>');
+   <a class="btn" href="tel:${esc(r.phone)}">Appeler</a><a class="btn alt" href="https://wa.me/${esc(String(r.phone).replace(/\D/g,''))}">WhatsApp</a></div>`).join('')||'<p class="card mut">Vos mises en relation validées apparaîtront ici avec les coordonnées.</p>');
 }
 
 // ===== src/pages/activities.js =====
@@ -498,12 +566,6 @@ function soon(id) {
     : '<p class="card">Module introuvable.</p>';
 }
 
-// ===== src/pages/centrale.js (catalogue) =====
-// ⚠️ À ce stade, les appels Supabase existants pour `products`/`suppliers` sont
-// conservés tels quels, car la consigne de ce lot A n'autorise pas de nouvel
-// appel et le backend n'est pas encore prêt. La couche `centraleService` ci-dessous
-// peut basculer en mode démo sans toucher aux écrans.
-
 // ===== src/data/centrale-demo.js =====
 const DEMO_MODE = true;
 const DEMO_CATEGORIES = ['Électronique','Maison','Mode','Beauté','Agroalimentaire','Bureautique'];
@@ -519,28 +581,19 @@ const DEMO_PRODUCTS = [
 ];
 
 // ===== src/services/centrale.js =====
-// Couche d'accès aux données de La Centrale.
-// Aujourd'hui : lit `centrale-demo.js`. Demain : brancher Supabase SANS toucher aux pages.
 const centraleService = (() => {
   const wait = ms => new Promise(r => setTimeout(r, ms));
   async function listProducts({q = '', category = ''} = {}) {
-    await wait(180); // simule latence modérée
+    await wait(180);
     if (!DEMO_MODE) throw new Error('Backend non branché');
     let rows = DEMO_PRODUCTS.slice();
     if (category) rows = rows.filter(r => r.category === category);
     if (q) { const t = q.toLowerCase(); rows = rows.filter(r => r.title.toLowerCase().includes(t) || r.description.toLowerCase().includes(t)); }
-    // Certifiés prioritaires
     rows.sort((a,b) => (b.certified?1:0) - (a.certified?1:0));
     return rows;
   }
-  async function listCategories() {
-    await wait(60);
-    return DEMO_CATEGORIES.slice();
-  }
-  async function getProduct(id) {
-    await wait(80);
-    return DEMO_PRODUCTS.find(p => p.id === id) || null;
-  }
+  async function listCategories() { await wait(60); return DEMO_CATEGORIES.slice(); }
+  async function getProduct(id) { await wait(80); return DEMO_PRODUCTS.find(p => p.id === id) || null; }
   return { listProducts, listCategories, getProduct };
 })();
 
@@ -548,47 +601,31 @@ const centraleService = (() => {
 const CT_AV = {in_stock:'En stock', limited:'Stock limité', out_of_stock:'Rupture', unconfirmed:'À confirmer'};
 function ctBanner() {
   if (!DEMO_MODE) return '';
-  return `<div class="ct-banner">${icon('info')}<span>Données de démonstration — le backend La Centrale n’est pas encore branché.</span></div>`;
-}
-function ctBadgeStatut(s) {
-  const map = {pending:['s','En attente'], confirmed:['','Confirmée'], refused:['s','Refusée'], published:['','Publiée'], review:['s','À valider'], rejected:['s','Refusée']};
-  const [cls, label] = map[s] || ['', s || '—'];
-  return `<span class="tag ${cls}">${esc(label)}</span>`;
+  return `<div class="ct-banner">${icon('info')}<span>Données de démonstration : le backend La Centrale n’est pas encore branché.</span></div>`;
 }
 function ctCardProduct(p) {
   const initial = (p.title || '?').trim().charAt(0).toUpperCase();
   return `<a class="ct-card" href="#/centrale/p/${encodeURIComponent(p.id)}" aria-label="${esc(p.title)}">
     <div class="ct-img">${p.image ? `<img src="${esc(p.image)}" alt="">` : initial}</div>
     <div class="ct-body">
-      <div class="ct-badges">
-        ${p.certified ? '<span class="tag ct-cert">Certifié</span>' : ''}
-        <span class="tag">${esc(CT_AV[p.availability] || 'Disponibilité')}</span>
-      </div>
+      <div class="ct-badges">${p.certified ? '<span class="tag ct-cert">Certifié</span>' : ''}<span class="tag">${esc(CT_AV[p.availability] || 'Disponibilité')}</span></div>
       <div class="ct-name">${esc(p.title)}</div>
       <div class="ct-price">${fcfa(p.price)}</div>
       ${p.commission != null ? `<div class="ct-com">Commission : ${fcfa(p.commission)}</div>` : ''}
-    </div>
-  </a>`;
+    </div></a>`;
 }
-function ctLoading() {
-  return `<div class="ct-loading">${'<div class="ct-skel"></div>'.repeat(6)}</div>`;
-}
-function ctEmpty(msg) {
-  return `<div class="ct-empty card"><b>${esc(msg)}</b>Essayez une autre catégorie ou modifiez votre recherche.</div>`;
-}
+const ctLoading = () => `<div class="ct-loading">${'<div class="ct-skel"></div>'.repeat(6)}</div>`;
+const ctEmpty = msg => `<div class="ct-empty card"><b>${esc(msg)}</b>Essayez une autre catégorie ou modifiez votre recherche.</div>`;
 
 let ctState = {q:'', cat:''};
 async function catalogue() {
   app.innerHTML = `
     <div class="row"><h1 style="margin:0">La Centrale</h1><a class="btn alt" href="#/centrale/mes-recos">Mes recommandations</a></div>
     ${ctBanner()}
-    <form id="ctf" class="ct-search" role="search">
-      <input id="ctq" type="search" placeholder="Rechercher un produit…" value="${esc(ctState.q)}" aria-label="Rechercher un produit">
-    </form>
+    <form id="ctf" class="ct-search" role="search"><input id="ctq" type="search" placeholder="Rechercher un produit…" value="${esc(ctState.q)}" aria-label="Rechercher un produit"></form>
     <div id="ctcats" class="ct-cats"></div>
     <div id="ctlist">${ctLoading()}</div>`;
-  const list = document.getElementById('ctlist');
-  const cats = document.getElementById('ctcats');
+  const list = document.getElementById('ctlist'), cats = document.getElementById('ctcats');
   const catsRows = await centraleService.listCategories().catch(() => []);
   const renderCats = () => {
     cats.innerHTML = [['', 'Tout'], ...catsRows.map(c => [c, c])].map(([v, l]) =>
@@ -606,12 +643,11 @@ async function catalogue() {
       document.getElementById('ctr').onclick = renderList;
     }
   }
-  renderCats();
-  renderList();
+  renderCats(); renderList();
   document.getElementById('ctf').onsubmit = e => { e.preventDefault(); ctState.q = document.getElementById('ctq').value.trim(); renderList(); };
 }
 
-// ===== src/pages/centrale/product.js (fiche produit — Lot A minimal) =====
+// ===== src/pages/centrale/product.js =====
 async function centraleProduct(id) {
   app.innerHTML = `<a href="#/centrale">← La Centrale</a>${ctBanner()}${ctLoading()}`;
   try {
@@ -641,30 +677,16 @@ const ROUTES = {'':home, opportunities, community, publish, contacts, activity:a
   admin:a => a === 'centrale' ? adminCentrale() : admin(), p:detail, m:soon, centrale:centraleRoot, product, immobilier, transport, seller};
 
 async function centraleRoot(a, b) {
-  // a,b = segments après '#/centrale/'
   if (!a) return catalogue();
   if (a === 'p') return centraleProduct(b);
-  if (a === 'mes-recos') return recommendationsStub();
-  if (a === 'ambassadeur') return ambassadorStub();
-  if (a === 'admin') return adminCentraleStub();
+  if (a === 'mes-recos') return comingSoonCt('Mes recommandations', 'Le suivi des ventes et des commissions sera activé avec le backend La Centrale.');
+  if (a === 'ambassadeur') return comingSoonCt('Espace ambassadeur', 'La gestion des offres sera activée avec le backend La Centrale.');
+  if (a === 'admin') return comingSoonCt('Administration La Centrale', 'La file de validation et de certification sera activée avec le backend La Centrale.');
   return catalogue();
 }
-
-// Lots C et D : stubs « En préparation » en attendant les prochains lots.
-function recommendationsStub() {
-  app.innerHTML = `<a href="#/centrale">← La Centrale</a>${ctBanner()}
-    <h1>Mes recommandations</h1>
-    <div class="card"><span class="tag s">En préparation</span><p class="mut">Le suivi des ventes et des commissions sera activé avec le backend La Centrale.</p></div>`;
-}
-function ambassadorStub() {
-  app.innerHTML = `<a href="#/centrale">← La Centrale</a>${ctBanner()}
-    <h1>Espace ambassadeur</h1>
-    <div class="card"><span class="tag s">En préparation</span><p class="mut">La gestion des offres sera activée avec le backend La Centrale.</p></div>`;
-}
-function adminCentraleStub() {
-  app.innerHTML = `<a href="#/centrale">← La Centrale</a>${ctBanner()}
-    <h1>Administration La Centrale</h1>
-    <div class="card"><span class="tag s">En préparation</span><p class="mut">La file de validation et de certification sera activée avec le backend La Centrale.</p></div>`;
+function comingSoonCt(title, text) {
+  app.innerHTML = `<a href="#/centrale">← La Centrale</a>${ctBanner()}<h1>${esc(title)}</h1>
+    <div class="card"><span class="tag s">En préparation</span><p class="mut">${esc(text)}</p></div>`;
 }
 
 async function route() {
