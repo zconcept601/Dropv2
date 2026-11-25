@@ -8,7 +8,10 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap" rel="stylesheet">
-<style>
+<script>
+window.addEventListener('error',e=>{document.body.insertAdjacentHTML('afterbegin','<pre style="padding:12px;color:#b00;white-space:pre-wrap">Erreur : '+e.message+'</pre>')});
+</script>
+ <style>
 :root{color-scheme:light dark;--bg:#F3F5FB;--surface:#fff;--ink:#0B1530;--mut:#66728A;--line:#E4E9F4;--brand:#2455F4;--brand2:#5B7CFF;--tint:#E8EEFF;--sun:#FFB020;--bad:#D92D3A;--g:var(--brand);--sh:0 1px 2px rgba(11,21,48,.05),0 10px 28px rgba(11,21,48,.07)}
 @media(prefers-color-scheme:dark){:root{--bg:#0A0F1F;--surface:#121A33;--ink:#EEF2FF;--mut:#97A3C2;--line:#1F2A4A;--tint:#1A2650;--brand:#5B7CFF;--sh:0 1px 2px rgba(0,0,0,.4)}}
 *{box-sizing:border-box}
@@ -202,7 +205,16 @@ async function q(p) {
   }
   return r.data;
 }
-
+// ===== Écrans pas encore présents dans ce fichier =====
+function comingSoon(title, back = '#/') {
+  app.innerHTML = `<a href="${back}">← Retour</a><h1>${esc(title)}</h1>
+  <div class="card"><span class="tag s">En préparation</span><p class="mut">Cet écran sera activé prochainement.</p></div>`;
+}
+function product()  { comingSoon('Produit', '#/centrale'); }
+function immobilier() { comingSoon('Immobilier', '#/opportunities'); }
+function transport()  { comingSoon('Transport', '#/opportunities'); }
+function seller()     { comingSoon('Mes fiches et produits', '#/profile'); }
+function adminCentrale() { comingSoon('Administration La Centrale', '#/admin'); }
 // ===== src/services/auth.js =====
 async function loadSession() {
   const {data} = await sb.auth.getSession(); const user = data.session?.user || null; let admin = false, amb = false;
