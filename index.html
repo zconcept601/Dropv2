@@ -106,6 +106,16 @@ nav a.x{display:none}
 .ct-skel{aspect-ratio:3/4;border-radius:18px;background:linear-gradient(100deg,var(--line) 20%,color-mix(in srgb,var(--line) 60%,var(--surface)) 40%,var(--line) 60%);background-size:200% 100%;animation:ct-shimmer 1.2s infinite}
 @keyframes ct-shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
 @media(prefers-reduced-motion:reduce){.ct-skel{animation:none}}
+.ct-gain{display:inline-block;align-self:flex-start;font-size:.78rem;font-weight:800;padding:3px 10px;border-radius:99px;background:#FFF1D1;color:#8A5A00}
+@media(prefers-color-scheme:dark){.ct-gain{background:#2A2210;color:#FFD98A}}
+.ct-rate{font-size:.75rem;color:var(--mut)}
+.ct-stars{color:var(--sun);letter-spacing:1px}
+.ct-steps{display:flex;gap:8px;overflow-x:auto;margin:0 0 12px}
+.ct-steps span{flex:1;min-width:104px;font-size:.78rem;font-weight:700;color:var(--mut);background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:8px 10px}
+.ct-steps b{display:inline-grid;place-items:center;width:20px;height:20px;border-radius:50%;background:var(--tint);color:var(--brand);margin-right:4px;font-size:.72rem}
+.ct-steps4 span{min-width:120px}
+.ct-prev{margin-top:20px;padding:12px;border:1.5px dashed var(--line);border-radius:16px}
+.ct-prev .ct-cats{margin:4px 0 8px}
 </style>
 </head>
 <body>
@@ -569,36 +579,50 @@ function soon(id) {
 // ===== src/data/centrale-demo.js =====
 const DEMO_MODE = true;
 const DEMO_CATEGORIES = ['Électronique','Maison','Mode','Beauté','Agroalimentaire','Bureautique'];
+const DEMO_WA = '22600000000'; // numéro fictif de démonstration
 const DEMO_PRODUCTS = [
-  {id:'p1', title:'Ventilateur rechargeable 12"', category:'Électronique', price:18500, commission:1500, certified:true, availability:'in_stock', supplier_display:'Atelier Kossi', image:'', description:'Ventilateur silencieux, batterie 6h, idéal en saison chaude.', conditions:'Garantie 3 mois. Retrait à Ouagadougou.'},
-  {id:'p2', title:'Mixeur manuel 5 vitesses', category:'Maison', price:9500, commission:800, certified:false, availability:'in_stock', supplier_display:'Mme Awa', image:'', description:'Mixeur manuel compact, bol 1L, 5 vitesses.', conditions:'Pas de garantie. Livraison possible.'},
-  {id:'p3', title:'Sac à main cuir PU', category:'Mode', price:12500, commission:1200, certified:true, availability:'limited', supplier_display:'Boutique Faso Chic', image:'', description:'Sac à main tendance, cuir PU, 3 coloris.', conditions:'Stock limité. Paiement à la livraison.'},
-  {id:'p4', title:'Savon noir africain 250g', category:'Beauté', price:2500, commission:300, certified:false, availability:'in_stock', supplier_display:'Coop Karité', image:'', description:'Savon noir traditionnel, karité et cendre.', conditions:'Lot de 10 minimum pour la revente.'},
-  {id:'p5', title:'Riz local 25kg', category:'Agroalimentaire', price:16000, commission:1000, certified:true, availability:'in_stock', supplier_display:'Union Riz Bobo', image:'', description:'Riz local parfumé, sac 25kg.', conditions:'Retrait à Bobo-Dioulasso.'},
-  {id:'p6', title:'Imprimante thermique BT', category:'Bureautique', price:45000, commission:3500, certified:true, availability:'unconfirmed', supplier_display:'TechSahel', image:'', description:'Imprimante thermique Bluetooth, tickets 58mm.', conditions:'Disponibilité à confirmer. Garantie 6 mois.'},
-  {id:'p7', title:'Chaussures enfant (paire)', category:'Mode', price:6500, commission:600, certified:false, availability:'in_stock', supplier_display:'Mme Fatou', image:'', description:'Chaussures enfant, tailles 24-34.', conditions:'Paiement à la commande.'},
-  {id:'p8', title:'Miel pur 1L', category:'Agroalimentaire', price:7500, commission:700, certified:true, availability:'limited', supplier_display:'Rucher du Plateau', image:'', description:'Miel pur de brousse, pot 1L.', conditions:'Stock limité. Retrait à Ouaga.'}
+  {id:'p1', title:'Ventilateur rechargeable 12"', category:'Électronique', price:18500, commission:1500, certified:true, availability:'in_stock', amb:'Ambassadeur Ouaga Centre', image:'', description:'Ventilateur silencieux, batterie 6h, idéal en saison chaude.', conditions:'Garantie 3 mois. Retrait à Ouagadougou.'},
+  {id:'p2', title:'Mixeur manuel 5 vitesses', category:'Maison', price:9500, commission:800, certified:false, availability:'in_stock', amb:'Ambassadeur Maison+', image:'', description:'Mixeur manuel compact, bol 1L, 5 vitesses.', conditions:'Pas de garantie. Livraison possible.'},
+  {id:'p3', title:'Sac à main cuir PU', category:'Mode', price:12500, commission:1200, certified:true, availability:'limited', amb:'Ambassadeur Mode Faso', image:'', description:'Sac à main tendance, cuir PU, 3 coloris.', conditions:'Stock limité. Paiement à la livraison.'},
+  {id:'p4', title:'Savon noir africain 250g', category:'Beauté', price:2500, commission:300, certified:false, availability:'in_stock', amb:'Ambassadeur Karité', image:'', description:'Savon noir traditionnel, karité et cendre.', conditions:'Lot de 10 minimum pour la revente.'},
+  {id:'p5', title:'Riz local 25kg', category:'Agroalimentaire', price:16000, commission:1000, certified:true, availability:'in_stock', amb:'Ambassadeur Bobo', image:'', description:'Riz local parfumé, sac 25kg.', conditions:'Retrait à Bobo-Dioulasso.'},
+  {id:'p6', title:'Imprimante thermique BT', category:'Bureautique', price:45000, commission:3500, certified:true, availability:'unconfirmed', amb:'Ambassadeur Tech', image:'', description:'Imprimante thermique Bluetooth, tickets 58mm.', conditions:'Disponibilité à confirmer. Garantie 6 mois.'},
+  {id:'p7', title:'Chaussures enfant (paire)', category:'Mode', price:6500, commission:600, certified:false, availability:'in_stock', amb:'Ambassadeur Mode Faso', image:'', description:'Chaussures enfant, tailles 24-34.', conditions:'Paiement à la commande.'},
+  {id:'p8', title:'Miel pur 1L', category:'Agroalimentaire', price:7500, commission:700, certified:true, availability:'limited', amb:'Ambassadeur Plateau', image:'', description:'Miel pur de brousse, pot 1L.', conditions:'Stock limité. Retrait à Ouaga.'}
 ];
+const DEMO_REVIEWS = {
+  p1:[{n:'Issa K.', r:5, t:'Très bon produit, mes clients sont satisfaits.', d:'2026-11-10'}, {n:'Aïcha T.', r:4, t:'Bonne commission, livraison rapide.', d:'2026-11-03'}],
+  p3:[{n:'Mariam S.', r:5, t:'Se revend facilement, belle qualité.', d:'2026-11-12'}],
+  p5:[{n:'Paul O.', r:4, t:'Riz apprécié, retrait simple à Bobo.', d:'2026-10-28'}, {n:'Fatou D.', r:3, t:'Bien, mais stock parfois court.', d:'2026-10-20'}]
+};
 
 // ===== src/services/centrale.js =====
 const centraleService = (() => {
   const wait = ms => new Promise(r => setTimeout(r, ms));
+  const avg = id => { const l = DEMO_REVIEWS[id] || []; return l.length ? l.reduce((a, x) => a + x.r, 0) / l.length : 0; };
   async function listProducts({q = '', category = ''} = {}) {
     await wait(180);
     if (!DEMO_MODE) throw new Error('Backend non branché');
     let rows = DEMO_PRODUCTS.slice();
     if (category) rows = rows.filter(r => r.category === category);
     if (q) { const t = q.toLowerCase(); rows = rows.filter(r => r.title.toLowerCase().includes(t) || r.description.toLowerCase().includes(t)); }
-    rows.sort((a,b) => (b.certified?1:0) - (a.certified?1:0));
-    return rows;
+    rows.sort((a, b) => (b.certified ? 1 : 0) - (a.certified ? 1 : 0));
+    return rows.map(r => ({...r, rating:avg(r.id), reviews:(DEMO_REVIEWS[r.id] || []).length}));
   }
   async function listCategories() { await wait(60); return DEMO_CATEGORIES.slice(); }
-  async function getProduct(id) { await wait(80); return DEMO_PRODUCTS.find(p => p.id === id) || null; }
-  return { listProducts, listCategories, getProduct };
+  async function getProduct(id) {
+    await wait(80); const p = DEMO_PRODUCTS.find(x => x.id === id);
+    return p ? {...p, rating:avg(id), reviews:(DEMO_REVIEWS[id] || []).length} : null;
+  }
+  async function listReviews(id) { await wait(60); return (DEMO_REVIEWS[id] || []).slice(); }
+  // Démo : l'avis n'est conservé que dans cette session (aucun enregistrement serveur)
+  async function addReview(id, r, t) { (DEMO_REVIEWS[id] = DEMO_REVIEWS[id] || []).unshift({n:'Vous', r, t, d:new Date().toISOString().slice(0, 10)}); }
+  return { listProducts, listCategories, getProduct, listReviews, addReview };
 })();
 
 // ===== src/pages/centrale/catalogue.js =====
 const CT_AV = {in_stock:'En stock', limited:'Stock limité', out_of_stock:'Rupture', unconfirmed:'À confirmer'};
+const ctStars = r => { const n = Math.round(r); return '★'.repeat(n) + '☆'.repeat(5 - n); };
 function ctBanner() {
   if (!DEMO_MODE) return '';
   return `<div class="ct-banner">${icon('info')}<span>Données de démonstration : le backend La Centrale n’est pas encore branché.</span></div>`;
@@ -608,21 +632,22 @@ function ctCardProduct(p) {
   return `<a class="ct-card" href="#/centrale/p/${encodeURIComponent(p.id)}" aria-label="${esc(p.title)}">
     <div class="ct-img">${p.image ? `<img src="${esc(p.image)}" alt="">` : initial}</div>
     <div class="ct-body">
-      <div class="ct-badges">${p.certified ? '<span class="tag ct-cert">Certifié</span>' : ''}<span class="tag">${esc(CT_AV[p.availability] || 'Disponibilité')}</span></div>
+      <div class="ct-badges">${p.certified ? '<span class="tag ct-cert">Certifié</span>' : ''}<span class="tag">${esc(CT_AV[p.availability] || '')}</span></div>
       <div class="ct-name">${esc(p.title)}</div>
       <div class="ct-price">${fcfa(p.price)}</div>
-      ${p.commission != null ? `<div class="ct-com">Commission : ${fcfa(p.commission)}</div>` : ''}
+      ${p.commission != null ? `<div class="ct-gain">Vous gagnez ${fcfa(p.commission)}</div>` : ''}
+      ${p.reviews ? `<div class="ct-rate"><span class="ct-stars">${ctStars(p.rating)}</span> ${p.rating.toFixed(1)} (${p.reviews})</div>` : '<div class="ct-rate">Pas encore d’avis</div>'}
     </div></a>`;
 }
 const ctLoading = () => `<div class="ct-loading">${'<div class="ct-skel"></div>'.repeat(6)}</div>`;
-const ctEmpty = msg => `<div class="ct-empty card"><b>${esc(msg)}</b>Essayez une autre catégorie ou modifiez votre recherche.</div>`;
 
 let ctState = {q:'', cat:''};
 async function catalogue() {
-  app.innerHTML = `
-    <div class="row"><h1 style="margin:0">La Centrale</h1><a class="btn alt" href="#/centrale/mes-recos">Mes recommandations</a></div>
+  app.innerHTML = `<h1 style="margin-bottom:4px">La Centrale</h1>
+    <p class="mut" style="margin:0 0 12px">Recommandez ou revendez sans stock, et gagnez une commission.</p>
     ${ctBanner()}
-    <form id="ctf" class="ct-search" role="search"><input id="ctq" type="search" placeholder="Rechercher un produit…" value="${esc(ctState.q)}" aria-label="Rechercher un produit"></form>
+    <div class="ct-steps"><span><b>1</b> Choisir un produit</span><span><b>2</b> Promouvoir</span><span><b>3</b> Être payé</span></div>
+    <form id="ctf" class="ct-search" role="search"><input id="ctq" type="search" placeholder="Que cherchez-vous ou voulez-vous vendre ?" value="${esc(ctState.q)}" aria-label="Rechercher un produit"></form>
     <div id="ctcats" class="ct-cats"></div>
     <div id="ctlist">${ctLoading()}</div>`;
   const list = document.getElementById('ctlist'), cats = document.getElementById('ctcats');
@@ -636,8 +661,13 @@ async function catalogue() {
     list.innerHTML = ctLoading();
     try {
       const rows = await centraleService.listProducts({q:ctState.q, category:ctState.cat});
-      list.innerHTML = rows.length ? `<div class="ct-grid">${rows.map(ctCardProduct).join('')}</div>`
-        : ctEmpty(ctState.q ? `Aucun produit ne correspond à « ${ctState.q} ».` : 'Le catalogue est vide pour le moment.');
+      const cert = rows.filter(r => r.certified), other = rows.filter(r => !r.certified);
+      const need = `<div class="card" style="margin-top:16px"><b>Vous ne trouvez pas ce qu’il vous faut ?</b>
+        <p class="mut">Publiez une recherche : le réseau pourra vous répondre.</p>
+        <a class="btn full" href="#/publish/search/${encodeURIComponent(ctState.q)}">Publier une recherche</a></div>`;
+      list.innerHTML = (rows.length ? (cert.length ? `<h2>Fournisseurs certifiés</h2><div class="ct-grid">${cert.map(ctCardProduct).join('')}</div>` : '') +
+        (other.length ? `<h2>${cert.length ? 'Autres produits' : 'Produits'}</h2><div class="ct-grid">${other.map(ctCardProduct).join('')}</div>` : '')
+        : `<div class="ct-empty card"><b>${esc(ctState.q ? 'Aucun produit ne correspond à « ' + ctState.q + ' ».' : 'Le catalogue est vide pour le moment.')}</b>Essayez une autre catégorie ou modifiez votre recherche.</div>`) + need;
     } catch (_) {
       list.innerHTML = `<div class="card"><b>Impossible de charger le catalogue.</b><p class="mut">Vérifiez votre connexion puis réessayez.</p><button id="ctr" class="alt full">Réessayer</button></div>`;
       document.getElementById('ctr').onclick = renderList;
@@ -648,25 +678,64 @@ async function catalogue() {
 }
 
 // ===== src/pages/centrale/product.js =====
+const ctPrev = {}; // aperçu démo des états, par produit
 async function centraleProduct(id) {
+  id = decodeURIComponent(id);
   app.innerHTML = `<a href="#/centrale">← La Centrale</a>${ctBanner()}${ctLoading()}`;
   try {
-    const p = await centraleService.getProduct(decodeURIComponent(id));
+    const p = await centraleService.getProduct(id);
     if (!p) { app.innerHTML = `<a href="#/centrale">← La Centrale</a>${ctBanner()}<p class="card">Produit introuvable.</p>`; return; }
+    const st = ctPrev[id] = ctPrev[id] || {c:'none', a:'none'};
     const initial = (p.title || '?').trim().charAt(0).toUpperCase();
     app.innerHTML = `<a href="#/centrale">← La Centrale</a>${ctBanner()}
       <h1>${esc(p.title)}</h1>
       <p class="ct-badges">${p.certified ? '<span class="tag ct-cert">Certifié</span>' : ''}<span class="tag">${esc(p.category || 'Général')}</span><span class="tag">${esc(CT_AV[p.availability] || '')}</span></p>
       <div class="ct-card" style="margin-bottom:12px"><div class="ct-img">${p.image ? `<img src="${esc(p.image)}" alt="">` : initial}</div></div>
-      <div class="card">
-        <div class="row"><b style="font-size:1.35rem">${fcfa(p.price)}</b>${p.commission != null ? `<span class="ct-com">Commission : ${fcfa(p.commission)}</span>` : ''}</div>
+      <div class="card"><div class="row"><b style="font-size:1.35rem">${fcfa(p.price)}</b><span class="ct-gain">Vous gagnez ${fcfa(p.commission)}</span></div>
         <p style="margin:10px 0 0">${esc(p.description)}</p>
         ${p.conditions ? `<p class="mut" style="margin-top:10px"><b>Conditions :</b> ${esc(p.conditions)}</p>` : ''}
-        <p class="mut" style="margin-top:10px">Fournisseur (masqué) : <b>${esc(p.supplier_display)}</b> · informations sensibles non affichées</p>
-      </div>
-      <button class="full" id="ctrec">Recommander</button>
-      <p class="mut">Cette action sera disponible quand le backend La Centrale sera branché.</p>`;
-    document.getElementById('ctrec').onclick = () => toast('En préparation : la recommandation sera activée prochainement.');
+        <p class="mut" style="margin-top:10px">Proposé par <b>${esc(p.amb)}</b> · le fournisseur reste masqué</p></div>
+      <div id="ctact"></div>
+      <h2>Comment ça marche</h2>
+      <div class="ct-steps ct-steps4"><span><b>1</b> Je demande</span><span><b>2</b> Je promeus</span><span><b>3</b> L’admin confirme la vente</span><span><b>4</b> Je suis payé</span></div>
+      <div id="ctrev"></div>
+      ${DEMO_MODE ? '<div class="ct-prev"><b>Aperçu démo des états</b><div class="mut">Contact</div><div class="ct-cats" id="pc"></div><div class="mut">Affiliation</div><div class="ct-cats" id="pa"></div></div>' : ''}`;
+    const act = document.getElementById('ctact');
+    function drawAct() {
+      const C = {
+        none:`<button class="full" id="ctc">Contacter l’ambassadeur</button>`,
+        pending:`<div class="card"><span class="tag s">En attente</span><p class="mut" style="margin:6px 0 0">Votre demande est chez ${esc(p.amb)}. Ses références s’afficheront dès qu’il l’aura acceptée.</p></div>`,
+        accepted:`<div class="card"><span class="tag ct-cert">Acceptée</span><p class="mut" style="margin:6px 0 10px">${esc(p.amb)} a accepté votre demande.</p><a class="btn full" href="https://wa.me/${DEMO_WA}" target="_blank" rel="noopener">Écrire sur WhatsApp</a></div>`,
+        refused:`<div class="card"><span class="tag s">Refusée</span><p class="mut" style="margin:6px 0 0">L’ambassadeur n’a pas donné suite. Vous pouvez en contacter un autre.</p></div>`};
+      const A = {
+        none:`<button class="alt full" id="cta">Je veux promouvoir ce produit</button>`,
+        pending:`<div class="card"><span class="tag s">Affiliation en attente de validation</span></div>`,
+        active:`<div class="card"><span class="tag ct-cert">Affiliation active</span><p class="mut" style="margin:6px 0 0">Suivi des ventes et commissions : non activé pour l’instant.</p></div>`};
+      act.innerHTML = C[st.c] + A[st.a];
+      const c = document.getElementById('ctc'), a = document.getElementById('cta');
+      if (c) c.onclick = () => toast('En préparation : l’envoi de la demande sera activé avec le backend.');
+      if (a) a.onclick = () => toast('En préparation : la demande d’affiliation sera activée avec le backend.');
+    }
+    function drawPrev() {
+      const pc = document.getElementById('pc'), pa = document.getElementById('pa'); if (!pc) return;
+      const mk = (key, items) => items.map(([v, l]) => `<button type="button" class="${st[key] === v ? '' : 'alt'}" data-k="${key}" data-v="${v}">${l}</button>`).join('');
+      pc.innerHTML = mk('c', [['none', 'Aucune'], ['pending', 'En attente'], ['accepted', 'Acceptée'], ['refused', 'Refusée']]);
+      pa.innerHTML = mk('a', [['none', 'Aucune'], ['pending', 'En attente'], ['active', 'Active']]);
+      app.querySelectorAll('.ct-prev [data-k]').forEach(b => b.onclick = () => { st[b.dataset.k] = b.dataset.v; drawAct(); drawPrev(); });
+    }
+    async function drawRev() {
+      const rv = await centraleService.listReviews(id), n = rv.length, m = n ? rv.reduce((s, x) => s + x.r, 0) / n : 0;
+      document.getElementById('ctrev').innerHTML = `<h2>Avis ${n ? `<span class="ct-stars">${ctStars(m)}</span> <span class="mut">${m.toFixed(1)} (${n})</span>` : ''}</h2>
+        ${rv.map(x => `<div class="card"><div class="row"><b>${esc(x.n)}</b><span class="ct-stars">${ctStars(x.r)}</span></div><p style="margin:6px 0 0">${esc(x.t)}</p><span class="mut">${esc(x.d)}</span></div>`).join('') || '<p class="card mut">Aucun avis pour le moment. Soyez le premier.</p>'}
+        <form id="rf" class="card"><b>Laisser un avis</b>
+          <label>Note<select id="rn"><option value="5">5 · Excellent</option><option value="4">4 · Bien</option><option value="3">3 · Moyen</option><option value="2">2 · Décevant</option><option value="1">1 · Mauvais</option></select></label>
+          <label>Votre avis<textarea id="rt" rows="3" maxlength="400" required></textarea></label>
+          <button class="full">Publier mon avis</button>${DEMO_MODE ? '<p class="mut">Démo : votre avis n’est pas enregistré sur le serveur.</p>' : ''}</form>`;
+      document.getElementById('rf').onsubmit = async e => { e.preventDefault();
+        await centraleService.addReview(id, Number(document.getElementById('rn').value), document.getElementById('rt').value.trim());
+        toast('Merci pour votre avis.'); drawRev(); };
+    }
+    drawAct(); drawPrev(); drawRev();
   } catch (_) {
     app.innerHTML = `<a href="#/centrale">← La Centrale</a>${ctBanner()}<p class="card">Impossible de charger ce produit.</p>`;
   }
