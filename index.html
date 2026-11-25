@@ -231,9 +231,10 @@ function authView(onDone,mode='login'){
 }
 
 // ===== src/pages/home.js =====
+  
+// ===== src/pages/home.js =====
 const by = rows => (rows || []).reduce((a, x) => (a[x.status] = (a[x.status] || 0) + 1, a), {});
 const total = c => Object.values(c).reduce((a, b) => a + b, 0);
-const statusText = c => [['approved', 'validée(s)'], ['pending', 'en attente'], ['rejected', 'refusée(s)'], ['expired', 'expirée(s)']].filter(([k]) => c[k]).map(([k, l]) => c[k] + ' ' + l).join(' · ') || 'Aucune';
 
 async function home() {
   const me = state.me.id, now = new Date().toISOString();
@@ -242,136 +243,69 @@ async function home() {
   const opp = (t, cols, owner) => sb.from(t).select(cols).eq('status', t === 'products' ? 'active' : 'approved').neq(owner, me).order('created_at', {ascending:false}).limit(3);
   const live = t => t === 'products' ? opp(t, 'id,title,category,price,created_at', 'created_by') : opp(t, 'id,title,category,city,created_at,expires_at', 'user_id').gt('expires_at', now);
   const mine = t => sb.from(t).select('status').eq('user_id', me).limit(300);
-  const [d, nt, pf, o1, o2, o3, mo, ms, mp, mt, mpr, aff, vl, a1, a2, a3, a4, a5, a6] = await Promise.all([
-    q(sb.rpc('member_dashboard')), sb.from('notifications').select('*').order('created_at', {ascending:false}).limit(3),
-    sb.from('profiles').select('full_name').eq('id', me).maybeSingle(), live('offers'), live('searches'), live('products'),
-    mine('offers'), mine('searches'), mine('properties'), mine('transport_requests'), sb.from('products').select('status').eq('created_by', me).limit(300),
-    sb.from('product_leads').select('id,status,product_id,products(title)').eq('user_id', me).eq('kind', 'promote').order('created_at', {ascending:false}).limit(50),
-    cnt('product_leads', x => x.eq('user_id', me).eq('status', 'validated')),
+  const [d, pf, o1, o2, o3, mo, ms, mp, mt, mpr, aff, a1, a2, a3, a4, a5, a6] = await Promise.all([
+    q(sb.rpc('member_dashboard')),
+    sb.from('profiles').select('full_name').eq('id', me).maybeSingle(),
+    live('offers'), live('searches'), live('products'),
+    mine('offers'), mine('searches'), mine('properties'), mine('transport_requests'),
+    sb.from('products').select('status').eq('created_by', me).limit(300),
+    sb.from('product_leads').select('id,status').eq('user_id', me).eq('kind', 'promote').limit(50),
     pend('offers'), pend('searches'), pend('properties'), pend('transport_requests'), pend('products'), pend('withdrawal_requests')]);
 
   const name = String(pf.data?.full_name || '').split(' ')[0];
-  const pool = [...(o1.data || []).map(x => ({...x, k:'Offre', h:'#/p/offer/', i:[x.category, x.city]})), ...(o2.data || []).map(x => ({...x, k:'Recherche', h:'#/p/search/', i:[x.category, x.city]})),
-    ...(o3.data || []).map(x => ({...x, k:'Produit', h:'#/product/', i:[x.category, fcfa(x.price)]}))].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+  const pool = [
+    ...(o1.data || []).map(x => ({...x, k:'Offre', h:'#/p/offer/', i:[x.category, x.city]})),
+    ...(o2.data || []).map(x => ({...x, k:'Recherche', h:'#/p/search/', i:[x.category, x.city]})),
+    ...(o3.data || []).map(x => ({...x, k:'Produit', h:'#/product/', i:[x.category, fcfa(x.price)]}))
+  ].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
   const picked = [], seen = new Set();
   pool.forEach(x => { if (picked.length < 3 && !seen.has(x.k)) { seen.add(x.k); picked.push(x); } });
   pool.forEach(x => { if (picked.length < 3 && !picked.includes(x)) picked.push(x); });
-  const co = by(mo.data), cs = by(ms.data), cp = by(mp.data), ct = by(mt.data), cpr = by(mpr.data);
-  const A = aff.data || [], affActive = A.filter(x => x.status === 'validated'), affPending = A.filter(x => x.status === 'new').length;
-  const ACT = [
-    {l:'Offres', href:'#/activity/pub', v:total(co), s:statusText(co)}, {l:'Recherches', href:'#/activity/pub', v:total(cs), s:statusText(cs)},
-    total(cp) && {l:'Immobilier', href:'#/activity/pub', v:total(cp), s:statusText(cp)}, total(ct) && {l:'Transport', href:'#/activity/pub', v:total(ct), s:statusText(ct)},
-    total(cpr) && {l:'Produits proposés', href:'#/seller', v:total(cpr), s:statusText(cpr)},
-    {l:'Affiliations actives', href:'#/activity/affil', v:affActive.length, s:(affActive.slice(0, 2).map(x => esc(x.products?.title)).join(', ') || 'Aucune') + (affPending ? ` · ${affPending} en attente` : '') + '<br>Ventes et commissions : suivi non activé'},
-    {l:'DropAds', href:'#/m/dropads', v:'—', s:'Module non ouvert : le suivi des campagnes arrivera avec lui'}].filter(Boolean);
-  const pubTotal = total(co) + total(cs) + total(cp) + total(ct);
-  const adm = (a1.count || 0) + (a2.count || 0) + (a3.count || 0) + (a4.count || 0);
-  const TODO = [[d.requests_pending, 'demande(s) de mise en relation à traiter', '#/activity/requests'], [d.leads_pending, 'demande(s) sur vos produits', '#/seller'],
-    [(co.rejected || 0) + (cs.rejected || 0) + (cp.rejected || 0) + (ct.rejected || 0), 'publication(s) refusée(s) à corriger', '#/activity/pub'], [cpr.rejected || 0, 'produit(s) refusé(s) à corriger', '#/seller'],
-    [state.isAdmin && adm, 'publication(s) à valider', '#/admin'], [state.isAdmin && a5.count, 'produit(s) à valider', '#/admin/centrale'], [state.isAdmin && a6.count, 'retrait(s) à traiter', '#/admin']].filter(x => x[0] > 0);
-  const QA = [['plus', 'Publier une offre', '#/publish'], ['file', 'Publier une recherche', '#/publish/search'], ['community', 'Communauté', '#/community'], ['store', 'La Centrale', '#/centrale'],
-    ['link', 'Mes affiliations', '#/activity/affil'], ['contacts', 'Mes contacts', '#/contacts'], ['wallet', 'Mon portefeuille', '#/wallet'],
-    ...MODULES.filter(m => m.status === 'ready' && ['immobilier', 'transport'].includes(m.id)).map(m => [m.icon, m.name, '#/' + m.id])];
 
-  app.innerHTML = `<p class="hello">Bonjour${name ? ', ' + esc(name) : ''} 👋</p>${d.notifications_unread > 0 ? `<p class="mut" style="margin-top:-6px"><a href="#/notifications">${d.notifications_unread} notification(s) non lue(s)</a></p>` : ''}
+  const co = by(mo.data), cs = by(ms.data), cp = by(mp.data), ct = by(mt.data), cpr = by(mpr.data);
+  const affActive = (aff.data || []).filter(x => x.status === 'validated').length;
+  const pubActive = (co.approved || 0) + (cs.approved || 0) + (cp.approved || 0) + (ct.approved || 0);
+  const rejected = (co.rejected || 0) + (cs.rejected || 0) + (cp.rejected || 0) + (ct.rejected || 0);
+  const adm = (a1.count || 0) + (a2.count || 0) + (a3.count || 0) + (a4.count || 0);
+
+  const TODO = [
+    [d.requests_pending, 'demande(s) de mise en relation', '#/activity/requests'],
+    [d.leads_pending, 'demande(s) sur vos produits', '#/seller'],
+    [rejected, 'publication(s) refusée(s) à corriger', '#/activity/pub'],
+    [cpr.rejected || 0, 'produit(s) refusé(s) à corriger', '#/seller'],
+    [state.isAdmin && adm, 'publication(s) à valider', '#/admin'],
+    [state.isAdmin && a5.count, 'produit(s) à valider', '#/admin/centrale'],
+    [state.isAdmin && a6.count, 'retrait(s) à traiter', '#/admin']
+  ].filter(x => x[0] > 0).slice(0, 4);
+
+  const QA = [
+    ['plus', 'Publier une offre', '#/publish'], ['file', 'Publier une recherche', '#/publish/search'],
+    ['store', 'La Centrale', '#/centrale'], ['community', 'Communauté', '#/community'],
+    ['contacts', 'Mes contacts', '#/contacts'], ['wallet', 'Mon portefeuille', '#/wallet']
+  ];
+
+  app.innerHTML = `<p class="hello">Bonjour${name ? ', ' + esc(name) : ''} 👋</p>
+  ${d.notifications_unread > 0 ? `<p class="mut" style="margin-top:-6px"><a href="#/notifications">${d.notifications_unread} notification(s) non lue(s)</a></p>` : ''}
+
+  ${TODO.length ? `<h2>À traiter</h2>${TODO.map(([n, l, h]) => `<a class="card row" href="${h}"><span><b>${n}</b> ${l}</span><span class="tag">Traiter</span></a>`).join('')}` : ''}
+
+  <div class="card hero"><small>Revenus disponibles</small><b>${fcfa(d.withdrawable)}</b>
+   <div class="row"><small>${d.gains_pending > 0 ? fcfa(d.gains_pending) + ' en attente' : 'Validés et retirables'}</small><a class="pill" href="#/wallet">Portefeuille</a></div></div>
 
   <h2>Opportunités à saisir</h2>
-  ${picked.map(x => `<a class="card" href="${x.h}${x.id}"><span class="tag${x.k === 'Recherche' ? ' s' : ''}">${x.k}</span><b>${esc(x.title)}</b><br><span class="mut">${x.i.filter(Boolean).map(esc).join(' · ') || 'Voir le détail'}</span></a>`).join('') || '<p class="card mut">Aucune opportunité disponible pour le moment.</p>'}
-  <p><a class="btn alt" href="#/community">Voir la Communauté</a><a class="btn alt" href="#/centrale">Voir La Centrale</a></p>
+  ${picked.map(x => `<a class="card" href="${x.h}${x.id}"><span class="tag${x.k === 'Recherche' ? ' s' : ''}">${x.k}</span><b>${esc(x.title)}</b><br><span class="mut">${x.i.filter(Boolean).map(esc).join(' · ') || 'Voir le détail'}</span></a>`).join('') || '<p class="card mut">Aucune opportunité pour le moment.</p>'}
+  <p><a class="btn alt" href="#/opportunities">Tout explorer</a></p>
 
-  <h2>Mes activités</h2><div class="grid">${ACT.map(a => `<a class="card stat" href="${a.href}"><b>${a.v}</b><span class="mut">${a.l}</span><br><span class="mut" style="font-size:.78rem">${a.s}</span></a>`).join('')}</div>
+  <h2>En un coup d’œil</h2>
+  <div class="grid3">
+   <a class="card stat" href="#/activity/pub"><b>${pubActive}</b><span class="mut">Publications actives</span></a>
+   <a class="card stat" href="#/contacts"><b>${d.contacts}</b><span class="mut">Mises en relation</span></a>
+   <a class="card stat" href="#/activity/affil"><b>${affActive}</b><span class="mut">Affiliations actives</span></a>
+  </div>
 
-  <h2>Ma progression</h2><div class="grid3">
-   <div class="card dim"><div class="ico">${icon('briefcase')}</div><b>Activité</b><p class="mut">${pubTotal} publication(s)<br>${total(cpr)} produit(s) proposé(s)<br>${affActive.length} affiliation(s) active(s)</p></div>
-   <div class="card dim r"><div class="ico">${icon('contacts')}</div><b>Relations</b><p class="mut">${d.contacts} mise(s) en relation établie(s)<br>${vl.count || 0} contact(s) fournisseur obtenu(s)<br><i>Les demandes en attente ne sont pas comptées.</i></p></div>
-   <div class="card dim g"><div class="ico">${icon('trend')}</div><b>Résultats</b><p class="mut">${fcfa(d.gains_total)} de commissions validées<br>Ventes confirmées : suivi non activé<br><i>Les revenus en attente ne sont pas comptés.</i></p></div></div>
-
-  <h2>Mes revenus</h2><div class="card hero"><small>Revenus disponibles</small><b>${fcfa(d.withdrawable)}</b><div class="row"><small>Validés et retirables</small><a class="pill" href="#/wallet">Retirer</a></div></div>
-  <div class="grid3"><div class="card stat"><b>${fcfa(d.gains_pending)}</b><span class="mut">Revenus en attente</span></div><div class="card stat"><b>${fcfa(d.gains_total)}</b><span class="mut">Revenus cumulés</span></div>
-   <div class="card stat"><b>${fcfa(d.spent_total)}</b><span class="mut">Dépenses cumulées</span></div></div>
-  <p><a class="btn" href="#/wallet">Ouvrir mon portefeuille</a><span class="mut">Opérations, historique, paiements et retraits</span></p>
-
-  <h2>Actions et actualités</h2><div class="sub">Mes priorités</div>
-  ${TODO.map(([n, l, h]) => `<a class="card row" href="${h}"><span><b>${n}</b> ${l}</span><span class="tag">Traiter</span></a>`).join('') || '<p class="card mut">Aucune action en attente.</p>'}
-  <div class="sub">Actions rapides</div><div class="grid">${QA.map(([i, l, h]) => `<a class="action" href="${h}"><span class="ico">${icon(i)}</span>${l}</a>`).join('')}</div>
-  <div class="sub">Activité récente</div>${(nt.data || []).map(n => `<div class="card ${n.is_read ? '' : 'unread'}"><b>${esc(n.title)}</b><br><span class="mut">${esc(n.message || '')}</span></div>`).join('') || '<p class="card mut">Aucune activité récente.</p>'}
-  <p><a href="#/notifications">Voir tout l’historique</a></p>`;
+  <h2>Accès rapide</h2>
+  <div class="grid">${QA.map(([i, l, h]) => `<a class="action" href="${h}"><span class="ico">${icon(i)}</span>${l}</a>`).join('')}</div>`;
 }
-
-// ===== src/pages/community.js =====
-const SKIND = {product:['La Centrale','#/product/'], property:['Immobilier','#/p/property/'], transport:['Transport','#/p/transport/'], offer:['Communauté','#/p/offer/']};
-async function community() {
-  const feed = t => sb.from(t).select('*').eq('status', 'approved').order('created_at', {ascending:false}).limit(30);
-  const mine = t => sb.from(t).select('id,title,status,expires_at').eq('user_id', state.me.id).order('created_at', {ascending:false}).limit(20);
-  const [o, s, mo, ms] = await Promise.all([feed('offers'), feed('searches'), mine('offers'), mine('searches')]);
-  const tab = state.feedTab, list = (tab === 'offer' ? o : s).data || [];
-  const my = [...(mo.data || []).map(x => ({...x, k:'offer'})), ...(ms.data || []).map(x => ({...x, k:'search'}))];
-  app.innerHTML = `<div class="row"><h1>Communauté</h1><a class="btn" href="#/publish">Publier</a></div>
-  <form id="sf" class="card"><input id="sq" type="search" minlength="2" maxlength="80" required placeholder="Que cherchez-vous ? Produit, bien, transport, service…"><button class="full">Rechercher</button></form>
-  <div id="res"></div><div id="feed">
-  <div><button class="${tab === 'offer' ? '' : 'alt'}" data-t="offer">Offres</button><button class="${tab === 'search' ? '' : 'alt'}" data-t="search">Recherches</button></div>
-  ${list.map(r => `<a class="card" href="#/p/${tab}/${r.id}"><b>${esc(r.title)}</b><br><span class="tag">${esc(r.category || 'Général')}</span><span class="mut">${esc(r.city || '')}</span>
-   <p class="mut" style="margin:6px 0 0">${esc(r.description).slice(0, 110)}</p></a>`).join('') || '<p class="card mut">Aucune publication validée pour le moment. Publiez la première.</p>'}
-  <h2>Mes publications</h2>${my.map(x => `<a class="card row" href="#/p/${x.k}/${x.id}"><span>${esc(x.title)}</span><span class="tag s">${esc(STATUS[x.status] || x.status)}</span></a>`).join('') || '<p class="card mut">Vous n’avez rien publié.</p>'}</div>`;
-  app.querySelectorAll('[data-t]').forEach(b => b.onclick = () => { state.feedTab = b.dataset.t; community(); });
-  document.getElementById('sf').onsubmit = async e => { e.preventDefault();
-    const t = document.getElementById('sq').value.trim(), res = document.getElementById('res'), fd = document.getElementById('feed');
-    res.innerHTML = '<p class="card mut" aria-busy="true">Recherche…</p>'; fd.hidden = true;
-    try {
-      const rows = await q(sb.rpc('search_network', {p_q:t}));
-      if (!rows.length) res.innerHTML = `<div class="card"><b>Rien ne correspond à « ${esc(t)} ».</b>
-        <p class="mut">Ni La Centrale, ni Immobilier, ni Transport, ni la Communauté ne répondent à ce besoin pour le moment. Publiez une recherche : le réseau pourra vous répondre.</p>
-        <a class="btn full" href="#/publish/search/${encodeURIComponent(t)}">Créer une recherche</a></div><button class="alt full" id="clr">Effacer la recherche</button>`;
-      else res.innerHTML = Object.keys(SKIND).filter(k => rows.some(r => r.kind === k)).map(k => `<h2>${SKIND[k][0]}</h2>` +
-        rows.filter(r => r.kind === k).map(r => `<a class="card" href="${SKIND[k][1]}${r.id}"><b>${esc(r.title)}</b><br><span class="tag">${esc(r.subtitle)}</span>
-        ${r.price != null ? `<b>${fcfa(r.price)}</b> ` : ''}<span class="mut">${esc(r.city || '')}</span></a>`).join('')).join('') + '<button class="alt full" id="clr">Effacer la recherche</button>';
-      document.getElementById('clr').onclick = () => community();
-    } catch (_) { res.innerHTML = ''; fd.hidden = false; }
-  };
-}
-
-// ===== src/pages/publish.js =====
-function publish(kind,txt){
-  let forced=false;
-  app.innerHTML=`<h1>Publier</h1><form id="f" class="card"><label>Type<select id="t"><option value="offer">Je propose (offre, service)</option><option value="search">Je cherche (fournisseur, prestataire)</option></select></label>
-  <label>Titre<input id="ti" required maxlength="120"></label><label>Description<textarea id="d" rows="5" required></textarea></label>
-  <label>Catégorie<input id="c" placeholder="Électroménager, transport…"></label><label>Ville<input id="v" placeholder="Ouagadougou"></label>
-  <button class="full">Envoyer pour validation</button>
-  <p class="mut">Pas d’annonce immobilière, de produit pour La Centrale ni de recherche d’emploi. Une fois validée, la publication reste visible 2 jours.</p></form>`;
-  if(kind==='search')document.getElementById('t').value='search';if(txt)document.getElementById('ti').value=decodeURIComponent(txt);
-  document.getElementById('f').onsubmit=async e=>{e.preventDefault();
-    if(document.getElementById('t').value==='search'&&!forced){
-      const r=await sb.rpc('search_network',{p_q:document.getElementById('ti').value.trim()}),m=(r.data||[]).filter(x=>x.kind==='product');
-      if(m.length){let box=document.getElementById('mt');if(!box){box=document.createElement('div');box.id='mt';document.getElementById('f').before(box)}
-        box.innerHTML=`<div class="card"><b>La Centrale a peut-être ce que vous cherchez</b>${m.slice(0,5).map(x=>`<a class="card" href="#/product/${x.id}"><b>${esc(x.title)}</b><br><span class="mut">${esc(x.subtitle)}</span> <b>${fcfa(x.price)}</b></a>`).join('')}
-        <p class="mut">Si aucun produit ne convient, publiez quand même : l’équipe examinera votre recherche.</p><button type="button" id="go">Publier quand même</button></div>`;
-        document.getElementById('go').onclick=()=>{forced=true;document.getElementById('f').requestSubmit()};return}}
-    try{await q(sb.from(t.value==='offer'?'offers':'searches').insert({user_id:state.me.id,title:ti.value.trim(),description:d.value.trim(),category:c.value.trim()||null,city:v.value.trim()||null}));
-    toast('Publication envoyée : en attente de validation.');location.hash='#/'}catch(_){}};
-}
-
-// ===== src/pages/detail.js =====
-const TBL = {offer:'offers', search:'searches', property:'properties', transport:'transport_requests'};
-const LBL = {offer:'Offre', search:'Recherche', property:'Immobilier', transport:'Transport'};
-const BACK = {offer:'#/community', search:'#/community', property:'#/immobilier', transport:'#/transport'};
-async function detail(type, id) {
-  if (!TBL[type]) throw new Error('type');
-  const r = await q(sb.from(TBL[type]).select('*').eq('id', id).single());
-  const mine = r.user_id === state.me.id;
-  const facts = [r.category, r.property_type && (r.operation + ' · ' + r.property_type), r.kind && (r.direction + ' · ' + r.kind),
-    r.price != null && fcfa(r.price), r.origin && r.destination && (r.origin + ' → ' + r.destination), r.travel_date && ('Date : ' + r.travel_date), r.city, r.district].filter(Boolean);
-  app.innerHTML = `<a href="${BACK[type]}">← Retour</a><h1>${esc(r.title)}</h1>
-  <p><span class="tag${type === 'search' ? ' s' : ''}">${LBL[type]}</span>${facts.map(f => `<span class="tag">${esc(f)}</span>`).join('')}</p>
-  <div class="card">${esc(r.description).replace(/\n/g, '<br>')}</div>
-  <p class="mut">Visible jusqu’au ${dt(r.expires_at)}${mine ? ' · Statut : ' + esc(r.status) : ''}</p>
-  ${mine ? '<p class="card">Ceci est votre publication.</p>' : `<form id="cr" class="card"><label>Message (facultatif)<textarea id="m" rows="3"></textarea></label>
-  <button class="full">Demander une mise en relation</button>
-  <p class="mut">Vous ne payez rien. Les coordonnées sont partagées si l’auteur accepte.</p></form>`}`;
-  if (!mine) document.getElementById('cr').onsubmit = async e => { e.preventDefault();
-    try { await q(sb.from('contact_requests').insert({requester_id:state.me.id, recipient_id:r.user_id, source_type:type, source_id:id, message:document.getElementById('m').value.trim() || null}));
-      toast('Demande envoyée.'); location.hash = '#/activity'; } catch (_) {} };
-}
-
 // ===== src/pages/contacts.js =====
 async function contacts(){
   const cs=await q(sb.from('contacts').select('*').order('created_at',{ascending:false}));
