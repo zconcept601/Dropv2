@@ -458,10 +458,9 @@ async function contacts(){
 }
 
 /* =========================================================================
-   ===== src/pages/activities.js — REFONTE COMPLÈTE DU VOLET ACTIVITÉ ====
+   ===== src/pages/activities.js — VOLET ACTIVITÉ (refonte + corrections) ===
    ========================================================================= */
 
-// --- Statuts existants (alignés sur STATUS et RST du projet) ---
 const ATABS = [['pub', 'Offres et besoins'], ['requests', 'Demandes'], ['products', 'Produits'], ['affil', 'Affiliations'], ['orders', 'Commandes'], ['ads', 'DropAds']];
 const RST = {pending:'En attente', accepted:'Acceptée', rejected:'Refusée', cancelled:'Annulée'};
 const SOON = {
@@ -469,8 +468,13 @@ const SOON = {
   orders:['Mes commandes', 'Vos achats, et ceux validés grâce à votre lien d’affiliation, apparaîtront ici dès l’ouverture du suivi des commandes.', null, null],
   ads:['DropAds', 'Gagnez de l’argent en partageant des offres ou des services. Ce module ouvrira quand ses règles seront définies.', '#/m/dropads', 'En savoir plus']};
 
+// --- A. Isolation des frais : la RLS sur contact_charges garantit que chaque
+//         membre ne voit que ses propres frais. Aucun filtre client fiable
+//         n'est possible sans nom de colonne de rattachement (non identifiable
+//         dans le fichier). On conserve donc status='due' + RLS serveur.
 async function dueInfo() {
   const r = await sb.from('contact_charges').select('amount').eq('status', 'due');
+  if (r.error) throw r.error;
   const a = r.data || []; return {n:a.length, sum:a.reduce((t, x) => t + Number(x.amount), 0)};
 }
 function dueCard(d) {
@@ -482,31 +486,35 @@ function bindPay(after) {
     try { const t = await q(sb.rpc('pay_contact_charges')); toast(fcfa(t) + ' réglés.'); after(); } catch (_) {} };
 }
 
-// --- Statut visuel pour les publications (uniquement les statuts réels) ---
 function pubStatus(s) {
   const label = STATUS[s] || s || '—';
   const cls = ['pending', 'rejected', 'expired', 'fulfilled'].includes(s) ? s : '';
   return `<span class="act-status ${cls}">${esc(label)}</span>`;
 }
 
-// --- Hub principal du volet Activité ---
+// --- B. Hub du volet Activité — compteurs distincts total / en attente,
+//         affiliations filtrées sur kind='promote' + status='validated'.
 async function activityHub() {
   const me = state.me.id;
   const cnt = async (t, f) => {
     let x = sb.from(t).select('*', {count:'exact', head:true});
     if (f) x = f(x);
-    const r = await x; return r.count || 0;
+    const r = await x;
+    if (r.error) throw r.error;
+    return r.count || 0;
   };
   const mineStatus = async t => {
     const rows = (await q(sb.from(t).select('status').eq('user_id', me).limit(500))) || [];
     return by(rows);
   };
-  const [co, cs, cp, ct, reqRecv, reqSent, leads, aff, due] = await Promise.all([
+  const [co, cs, cp, ct, reqRecvTotal, reqRecvPending, reqSentTotal, reqSentPending, leadsNew, leadsAffValidated, due] = await Promise.all([
     mineStatus('offers'), mineStatus('searches'), mineStatus('properties'), mineStatus('transport_requests'),
+    cnt('contact_requests', x => x.eq('recipient_id', me)),
     cnt('contact_requests', x => x.eq('recipient_id', me).eq('status', 'pending')),
+    cnt('contact_requests', x => x.eq('requester_id', me)),
     cnt('contact_requests', x => x.eq('requester_id', me).eq('status', 'pending')),
-    cnt('product_leads', x => x.eq('user_id', me).eq('status', 'new')),
-    cnt('product_leads', x => x.eq('user_id', me).eq('status', 'validated')),
+    cnt('product_leads', x => x.eq('user_id', me).eq('kind', 'promote').eq('status', 'new')),
+    cnt('product_leads', x => x.eq('user_id', me).eq('kind', 'promote').eq('status', 'validated')),
     dueInfo()
   ]);
   const all = {};
@@ -519,28 +527,33 @@ async function activityHub() {
   const donePub = all.fulfilled || 0;
   const todo = [
     [pendingPub, 'publication(s) en attente de validation', '#/activity/publications?statut=pending'],
-    [reqRecv, 'demande(s) de relation à traiter', '#/activity/relations?onglet=recues&statut=pending'],
+    [reqRecvPending, 'demande(s) de relation reçue(s) à traiter', '#/activity/relations?onglet=recues&statut=pending'],
     [rejectedPub, 'publication(s) refusée(s) à corriger', '#/activity/publications?statut=rejected'],
-    [leads, 'demande(s) de promotion à examiner', '#/activity/commerce?onglet=leads'],
+    [leadsNew, 'demande(s) de promotion à examiner', '#/activity/commerce?onglet=leads'],
     [due.n > 0 ? due.n : 0, 'mise(s) en relation à régler (' + fcfa(due.sum) + ')', '#/activity/relations']
   ].filter(x => x[0] > 0).slice(0, 4);
 
   const tiles = [
     ['briefcase', 'Mes publications', '#/activity/publications', `${tot} au total · ${pendingPub} en attente`],
-    ['contacts', 'Mes mises en relation', '#/activity/relations', `${reqRecv} reçue(s) · ${reqSent} envoyée(s)`],
-    ['store', 'Mon espace commercial', '#/activity/commerce', `${leads + aff} élément(s) · produits et affiliations`],
-    ['wallet', 'Mes transactions', '#/activity/transactions', 'Commandes, ventes, statuts'],
-    ['megaphone', 'Mes campagnes', '#/activity/campagnes', 'DropAds — module à venir']
+    ['contacts', 'Mes mises en relation', '#/activity/relations', `${reqRecvTotal} reçue(s) · ${reqSentTotal} envoyée(s)`],
+    ['store', 'Mon espace commercial', '#/activity/commerce', `${leadsNew} promo · ${leadsAffValidated} affiliation(s)`],
+    ['wallet', 'Mes transactions', '#/activity/transactions', 'Suivi — bientôt disponible'],
+    ['megaphone', 'Mes campagnes', '#/activity/campagnes', 'DropAds — bientôt disponible']
   ];
 
   app.innerHTML = `<h1>Mon activité</h1>
     <p class="mut" style="margin-top:-8px">Suivi de vos publications, relations, opérations commerciales et transactions.</p>
     ${todo.length ? `<h2>À traiter</h2>${todo.map(([n, l, h]) => `<a class="card row" href="${h}"><span><b>${n}</b> ${l}</span><span class="tag s">Traiter</span></a>`).join('')}` : ''}
     <h2>Tableau de bord</h2>
-    <div class="grid"><a class="card stat" href="#/activity/publications"><b>${approvedPub}</b><span class="mut">Publications publiées</span></a>
-      <a class="card stat" href="#/activity/publications?statut=pending"><b>${pendingPub}</b><span class="mut">En attente de validation</span></a>
-      <a class="card stat" href="#/activity/relations"><b>${reqRecv}</b><span class="mut">Demandes reçues en attente</span></a>
-      <a class="card stat" href="#/activity/commerce?onglet=affiliations"><b>${aff}</b><span class="mut">Affiliations actives</span></a>
+    <div class="grid">
+      <a class="card stat" href="#/activity/publications"><b>${approvedPub}</b><span class="mut">Publications publiées</span></a>
+      <a class="card stat" href="#/activity/publications?statut=pending"><b>${pendingPub}</b><span class="mut">Publications en attente</span></a>
+      <a class="card stat" href="#/activity/relations?onglet=recues"><b>${reqRecvTotal}</b><span class="mut">Demandes reçues (total)</span></a>
+      <a class="card stat" href="#/activity/relations?onglet=recues&statut=pending"><b>${reqRecvPending}</b><span class="mut">Demandes reçues en attente</span></a>
+      <a class="card stat" href="#/activity/relations?onglet=envoyees"><b>${reqSentTotal}</b><span class="mut">Demandes envoyées (total)</span></a>
+      <a class="card stat" href="#/activity/relations?onglet=envoyees&statut=pending"><b>${reqSentPending}</b><span class="mut">Demandes envoyées en attente</span></a>
+      <a class="card stat" href="#/activity/commerce?onglet=affiliations"><b>${leadsAffValidated}</b><span class="mut">Affiliations actives</span></a>
+      <a class="card stat" href="#/activity/commerce?onglet=leads"><b>${leadsNew}</b><span class="mut">Promotions à examiner</span></a>
     </div>
     <h2>Explorer</h2>
     <div class="grid">${tiles.map(([i, l, h, d]) => `<a class="card act-tile" href="${h}"><span class="ico">${icon(i)}</span><b>${esc(l)}</b><span class="mut">${esc(d)}</span></a>`).join('')}</div>
@@ -571,28 +584,36 @@ async function activityPublications(statut) {
     <p><a class="btn" href="#/publish">Publier une offre</a><a class="btn alt" href="#/publish/search">Publier un besoin</a></p>
     <div class="act-filters">${filtres.map(([k, l]) => `<button class="${statut === k ? '' : 'alt'}" data-f="${k}">${l}</button>`).join('')}</div>
     <div id="list">${list.map(x => `<a class="card row" href="#/p/${x.k}/${x.id}"><span><span class="tag">${x.l}</span>${esc(x.title)}<br><span class="mut">${x.expires_at ? 'Jusqu’au ' + dt(x.expires_at) : ''}</span></span>${pubStatus(x.status)}</a>`).join('') || `<div class="card act-empty"><b>Aucune publication dans cette catégorie.</b>Publiez une offre ou un besoin depuis les boutons ci-dessus.</div>`}</div>`;
-  app.querySelectorAll('[data-f]').forEach(b => b.onclick = () => {
-    const v = b.dataset.f;
-    activityPublications(v);
-  });
+  app.querySelectorAll('[data-f]').forEach(b => b.onclick = () => activityPublications(b.dataset.f));
 }
 
-// --- B. Mes mises en relation ---
+// --- C. Mes mises en relation — deux requêtes distinctes côté serveur ---
 async function activityRelations(onglet, statut) {
   const me = state.me.id;
-  const rq = await q(sb.from('contact_requests').select('*').order('created_at', {ascending:false}).limit(80));
-  const all = (rq || []).filter(r => r.recipient_id === me || r.requester_id === me);
-  const due = await dueInfo();
   onglet = onglet === 'envoyees' ? 'envoyees' : 'recues';
   const isRecv = onglet === 'recues';
-  const base = all.filter(r => (isRecv ? r.recipient_id === me : r.requester_id === me));
+  const col = isRecv ? 'recipient_id' : 'requester_id';
+
+  const baseQ = () => {
+    let x = sb.from('contact_requests').select('*').eq(col, me).order('created_at', {ascending:false}).limit(80);
+    if (statut) x = x.eq('status', statut);
+    return x;
+  };
+  const [listRes, recvTotalRes, sentTotalRes, due] = await Promise.all([
+    q(baseQ()),
+    sb.from('contact_requests').select('*', {count:'exact', head:true}).eq('recipient_id', me),
+    sb.from('contact_requests').select('*', {count:'exact', head:true}).eq('requester_id', me),
+    dueInfo()
+  ]);
+  const list = listRes || [];
+  const totalRecv = recvTotalRes.count || 0;
+  const totalSent = sentTotalRes.count || 0;
   const statuts = [['', 'Toutes'], ['pending', 'En attente'], ['accepted', 'Acceptées'], ['rejected', 'Refusées'], ['cancelled', 'Annulées']];
-  const list = base.filter(r => !statut || r.status === statut);
   app.innerHTML = `<a class="act-crumb" href="#/activity">← Activité</a><h1>Mes mises en relation</h1>
     ${dueCard(due)}
     <div class="act-subtabs">
-      <button class="${onglet === 'recues' ? '' : 'alt'}" data-o="recues">Reçues (${all.filter(r => r.recipient_id === me).length})</button>
-      <button class="${onglet === 'envoyees' ? '' : 'alt'}" data-o="envoyees">Envoyées (${all.filter(r => r.requester_id === me).length})</button>
+      <button class="${onglet === 'recues' ? '' : 'alt'}" data-o="recues">Reçues (${totalRecv})</button>
+      <button class="${onglet === 'envoyees' ? '' : 'alt'}" data-o="envoyees">Envoyées (${totalSent})</button>
     </div>
     <div class="act-filters">${statuts.map(([k, l]) => `<button class="${statut === k ? '' : 'alt'}" data-f="${k}">${l}</button>`).join('')}</div>
     <div id="list">${list.map(r => { const rec = r.recipient_id === me; return `<div class="card">
@@ -600,7 +621,7 @@ async function activityRelations(onglet, statut) {
       <span class="mut">${dt(r.created_at)}</span>
       <p style="margin:6px 0">${esc(r.message || '(sans message)')}</p>
       ${r.status === 'pending' ? (rec ? `<button data-a="accepted" data-i="${r.id}">Accepter</button><button class="alt" data-a="rejected" data-i="${r.id}">Refuser</button>` : `<button class="alt" data-a="cancelled" data-i="${r.id}">Annuler</button>`) : ''}
-    </div>`; }).join('') || `<div class="card act-empty"><b>Aucune demande ${isRecv ? 'reçue' : 'envoyée'}.</b>${isRecv ? 'Les demandes de mise en relation qui vous sont adressées apparaîtront ici.' : 'Vos demandes de mise en relation apparaîtront ici.'}</div>`}</div>`;
+    </div>`; }).join('') || `<div class="card act-empty"><b>Aucune demande ${isRecv ? 'reçue' : 'envoyée'}${statut ? ' dans ce statut' : ''}.</b>${isRecv ? 'Les demandes de mise en relation qui vous sont adressées apparaîtront ici.' : 'Vos demandes de mise en relation apparaîtront ici.'}</div>`}</div>`;
   bindPay(() => activityRelations(onglet, statut));
   app.querySelectorAll('[data-o]').forEach(b => b.onclick = () => activityRelations(b.dataset.o, statut));
   app.querySelectorAll('[data-f]').forEach(b => b.onclick = () => activityRelations(onglet, b.dataset.f));
@@ -610,53 +631,60 @@ async function activityRelations(onglet, statut) {
   });
 }
 
-// --- C. Mon espace commercial ---
+// --- D. Mon espace commercial — contact / promotion / affiliation séparés ---
 async function activityCommerce(onglet) {
   const me = state.me.id;
-  onglet = onglet === 'leads' || onglet === 'affiliations' ? onglet : 'produits';
-  const leads = onglet === 'leads'
-    ? (await q(sb.from('product_leads').select('id,status,product_id,kind,created_at,products(title)').eq('user_id', me).order('created_at', {ascending:false}).limit(50))) || []
-    : [];
-  const aff = onglet === 'affiliations'
-    ? (await q(sb.from('product_leads').select('id,status,product_id,products(title)').eq('user_id', me).eq('kind', 'promote').order('created_at', {ascending:false}).limit(50))) || []
-    : [];
-  const LSTAT = {new:'En attente de validation', validated:'Active', refused:'Refusée'};
-  const tabs = [
-    ['produits', 'Produits et fiches'],
-    ['leads', 'Demandes de promotion'],
-    ['affiliations', 'Affiliations']
-  ];
+  onglet = ['leads', 'affiliations', 'contacts'].includes(onglet) ? onglet : 'produits';
+
   let body = '';
   if (onglet === 'produits') {
-    body = `<a class="card" href="#/seller"><b>Mes fiches et produits</b><br><span class="mut">Créez des fiches fournisseurs, proposez des produits et traitez les demandes reçues.</span></a>`;
+    body = `<div class="card"><span class="tag s">En préparation</span>
+      <b>Mes fiches et produits</b>
+      <p class="mut" style="margin:8px 0 0">La gestion de vos fiches fournisseurs et la publication de produits sur La Centrale ouvriront prochainement.</p>
+      <a class="btn full" href="#/seller">Voir l’écran (en préparation)</a></div>`;
+  } else if (onglet === 'contacts') {
+    const rows = (await q(sb.from('product_leads').select('id,status,product_id,kind,created_at,products(title)').eq('user_id', me).neq('kind', 'promote').order('created_at', {ascending:false}).limit(50))) || [];
+    const LSTAT = {new:'En attente', validated:'Acceptée', refused:'Refusée'};
+    body = `<p class="mut">Demandes de contact reçues sur vos produits.</p>` +
+      (rows.map(x => `<a class="card row" href="#/product/${x.product_id}"><span>${esc(x.products?.title || 'Produit')}<br><span class="mut">${dt(x.created_at)} · ${esc(x.kind || 'contact')}</span></span><span class="act-status ${x.status === 'validated' ? 'fulfilled' : x.status === 'refused' ? 'rejected' : 'pending'}">${esc(LSTAT[x.status] || x.status)}</span></a>`).join('')
+       || `<div class="card act-empty"><b>Aucune demande de contact.</b>Les demandes adressées à vos produits apparaîtront ici.</div>`);
   } else if (onglet === 'leads') {
-    body = `<p class="mut">Demandes reçues sur vos produits et propositions de promotion.</p>` +
-      (leads.map(x => `<a class="card row" href="#/product/${x.product_id}"><span>${esc(x.products?.title || 'Produit')}<br><span class="mut">${dt(x.created_at)} · ${x.kind === 'promote' ? 'Promotion' : 'Contact'}</span></span><span class="tag s">${LSTAT[x.status] || x.status}</span></a>`).join('') || `<div class="card act-empty"><b>Aucune demande de promotion.</b>Les demandes adressées à vos produits apparaîtront ici.</div>`);
+    const rows = (await q(sb.from('product_leads').select('id,status,product_id,kind,created_at,products(title)').eq('user_id', me).eq('kind', 'promote').order('created_at', {ascending:false}).limit(50))) || [];
+    const LSTAT = {new:'En attente de validation', validated:'Active', refused:'Refusée'};
+    body = `<p class="mut">Vos demandes de promotion de produits.</p>` +
+      (rows.map(x => `<a class="card row" href="#/product/${x.product_id}"><span>${esc(x.products?.title || 'Produit')}<br><span class="mut">${dt(x.created_at)}</span></span><span class="act-status ${x.status === 'validated' ? 'fulfilled' : x.status === 'refused' ? 'rejected' : 'pending'}">${esc(LSTAT[x.status] || x.status)}</span></a>`).join('')
+       || `<div class="card act-empty"><b>Aucune demande de promotion.</b>La demande d’affiliation n’est pas encore active ; vos futures demandes apparaîtront ici.</div>`);
   } else {
-    body = `<p class="mut">La demande d’affiliation n’est pas encore active. Vos affiliations apparaîtront ici dès son ouverture.</p>` +
-      (aff.map(x => `<a class="card row" href="#/product/${x.product_id}"><span>${esc(x.products?.title || 'Produit')}</span><span class="act-status ${x.status === 'validated' ? 'fulfilled' : x.status === 'refused' ? 'rejected' : 'pending'}">${LSTAT[x.status]}</span></a>`).join('') || `<div class="card act-empty"><b>Aucune affiliation.</b>Cette fonctionnalité sera ouverte prochainement.</div>`);
+    const rows = (await q(sb.from('product_leads').select('id,status,product_id,products(title)').eq('user_id', me).eq('kind', 'promote').eq('status', 'validated').order('created_at', {ascending:false}).limit(50))) || [];
+    body = `<p class="mut">Produits que vous promouvez activement.</p>` +
+      (rows.map(x => `<a class="card row" href="#/product/${x.product_id}"><span>${esc(x.products?.title || 'Produit')}</span><span class="act-status fulfilled">Active</span></a>`).join('')
+       || `<div class="card act-empty"><b>Aucune affiliation active.</b>Cette fonctionnalité sera ouverte prochainement.</div>`);
   }
+
+  const tabs = [
+    ['produits', 'Produits et fiches'],
+    ['contacts', 'Demandes de contact'],
+    ['leads', 'Demandes de promotion'],
+    ['affiliations', 'Affiliations actives']
+  ];
   app.innerHTML = `<a class="act-crumb" href="#/activity">← Activité</a><h1>Mon espace commercial</h1>
     <div class="act-subtabs">${tabs.map(([k, l]) => `<button class="${onglet === k ? '' : 'alt'}" data-o="${k}">${l}</button>`).join('')}</div>
     ${body}`;
   app.querySelectorAll('[data-o]').forEach(b => b.onclick = () => activityCommerce(b.dataset.o));
 }
 
-// --- D. Mes transactions ---
+// --- E. Mes transactions — pas de support backend côté membre ---
 async function activityTransactions() {
-  // Le code existant n'expose pas de tables `orders`/`sales` accessibles par le membre.
-  // On ne fabrique donc aucune donnée : on renvoie vers le portefeuille pour les mouvements réels.
   app.innerHTML = `<a class="act-crumb" href="#/activity">← Activité</a><h1>Mes transactions</h1>
     <div class="card"><span class="tag s">Bientôt disponible</span>
       <p class="mut" style="margin:10px 0 0">Le suivi des commandes, ventes et transactions sera activé prochainement. En attendant, tous vos mouvements d’argent (gains, dépenses, retraits) sont consultables dans votre portefeuille.</p>
       <a class="btn full" href="#/wallet">Ouvrir mon portefeuille</a></div>`;
 }
 
-// --- E. Mes campagnes ---
+// --- F. Mes campagnes — DropAds en préparation ---
 function activityCampaigns() {
-  // DropAds : module 'soon' dans MODULES. On n'affiche pas de faux compteurs.
   app.innerHTML = `<a class="act-crumb" href="#/activity">← Activité</a><h1>Mes campagnes</h1>
-    <div class="card"><span class="tag s">Bientôt</span>
+    <div class="card"><span class="tag s">Bientôt disponible</span>
       <h2 style="margin-top:8px">DropAds</h2>
       <p class="mut">Gagnez de l’argent en partageant des offres ou des services. Ce module ouvrira quand ses règles seront définies.</p>
       <a class="btn full" href="#/m/dropads">En savoir plus</a></div>`;
@@ -664,7 +692,6 @@ function activityCampaigns() {
 
 // --- Routeur interne du volet Activité ---
 async function activities(sub, b) {
-  // La sous-route est dans b (3e segment), ex: #/activity/publications
   const subRoute = (b || '').split('?')[0];
   const params = new URLSearchParams((b || '').split('?')[1] || '');
   if (!subRoute) return activityHub();
@@ -673,7 +700,7 @@ async function activities(sub, b) {
   if (subRoute === 'commerce') return activityCommerce(params.get('onglet') || 'produits');
   if (subRoute === 'transactions') return activityTransactions();
   if (subRoute === 'campagnes') return activityCampaigns();
-  // Rétro-compatibilité des anciennes routes #/activity/pub, /requests, etc.
+  // Rétro-compatibilité anciennes routes
   if (subRoute === 'pub') return activityPublications('');
   if (subRoute === 'requests') return activityRelations('recues', '');
   if (subRoute === 'products') return activityCommerce('produits');
