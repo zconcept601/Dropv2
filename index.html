@@ -116,6 +116,36 @@ nav a.x{display:none}
 .ct-steps4 span{min-width:120px}
 .ct-prev{margin-top:20px;padding:12px;border:1.5px dashed var(--line);border-radius:16px}
 .ct-prev .ct-cats{margin:4px 0 8px}
+
+/* ===== ACTIVITÉ (refonte) ===== */
+.act-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:8px}
+.act-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.act-grid .card{margin:0}
+.act-tile{display:flex;flex-direction:column;gap:6px;min-height:118px}
+.act-tile .ico{margin-bottom:2px}
+.act-tile b{font-size:.95rem}
+.act-tile .mut{font-size:.82rem;line-height:1.3}
+.act-num{font-variant-numeric:tabular-nums;font-weight:800;font-size:1.35rem;letter-spacing:-.02em;margin-top:auto}
+.act-filters{display:flex;gap:6px;overflow-x:auto;padding:4px 0 10px;margin-bottom:4px}
+.act-filters button{white-space:nowrap;padding:8px 14px;font-size:.85rem;margin:0}
+.act-status{display:inline-block;font-size:.72rem;font-weight:800;padding:2px 9px;border-radius:99px;background:var(--tint);color:var(--brand);margin-left:6px}
+.act-status.pending{background:#FFF1D1;color:#8A5A00}
+.act-status.rejected{background:#FCE3E5;color:#A01A26}
+.act-status.expired{background:#E7EAF3;color:#5B6B8A}
+.act-status.fulfilled{background:#E7F7EE;color:#0E6B3A}
+@media(prefers-color-scheme:dark){
+ .act-status.pending{background:#2A2210;color:#FFD98A}
+ .act-status.rejected{background:#3A1116;color:#F9A6AE}
+ .act-status.expired{background:#1F2A4A;color:#A9B6D4}
+ .act-status.fulfilled{background:#0E2E1C;color:#8FE7B8}
+}
+.act-subtabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+.act-subtabs button{padding:7px 12px;font-size:.82rem;margin:0}
+.act-crumb{display:inline-block;margin-bottom:8px;font-weight:700}
+.act-section-h{margin:20px 0 8px;font-size:.78rem;font-weight:800;color:var(--mut);text-transform:uppercase;letter-spacing:.05em}
+.act-empty{padding:22px 16px;text-align:center;color:var(--mut)}
+.act-empty b{color:var(--ink);display:block;margin-bottom:6px}
+.act-due{margin-bottom:12px}
 </style>
 </head>
 <body>
@@ -175,7 +205,8 @@ const P = {
   plus:'<circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/>',
   link:'<path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/>',
   file:'<path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/>',
-  info:'<circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v5h1"/>'};
+  info:'<circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v5h1"/>',
+  alert:'<path d="M12 3l9 16H3z"/><path d="M12 10v4M12 17h.01"/>'};
 const icon = n => `<svg viewBox="0 0 24 24" aria-hidden="true">${P[n] || ''}</svg>`;
 const TABS = [['#/','Accueil','home'],['#/opportunities','Opportunités','compass'],['#/activity','Activité','briefcase'],['#/wallet','Portefeuille','wallet'],
   ['#/centrale','La Centrale','store',1],
@@ -214,7 +245,7 @@ function comingSoon(title, back = '#/') {
   app.innerHTML = `<a href="${back}">← Retour</a><h1>${esc(title)}</h1>
   <div class="card"><span class="tag s">En préparation</span><p class="mut">Cet écran sera activé prochainement.</p></div>`;
 }
-function product() { comingSoon('Produit', '#/centrale'); }
+function product(id) { return centraleProduct(id); }
 function immobilier() { comingSoon('Immobilier', '#/opportunities'); }
 function transport() { comingSoon('Transport', '#/opportunities'); }
 function seller() { comingSoon('Mes fiches et produits', '#/profile'); }
@@ -426,56 +457,232 @@ async function contacts(){
    <a class="btn" href="tel:${esc(r.phone)}">Appeler</a><a class="btn alt" href="https://wa.me/${esc(String(r.phone).replace(/\D/g,''))}">WhatsApp</a></div>`).join('')||'<p class="card mut">Vos mises en relation validées apparaîtront ici avec les coordonnées.</p>');
 }
 
-// ===== src/pages/activities.js =====
+/* =========================================================================
+   ===== src/pages/activities.js — REFONTE COMPLÈTE DU VOLET ACTIVITÉ ====
+   ========================================================================= */
+
+// --- Statuts existants (alignés sur STATUS et RST du projet) ---
 const ATABS = [['pub', 'Offres et besoins'], ['requests', 'Demandes'], ['products', 'Produits'], ['affil', 'Affiliations'], ['orders', 'Commandes'], ['ads', 'DropAds']];
 const RST = {pending:'En attente', accepted:'Acceptée', rejected:'Refusée', cancelled:'Annulée'};
 const SOON = {
   affil:['Mes affiliations', 'Les produits que vous promouvez et les commissions de vos ventes apparaîtront ici. La demande d’affiliation n’est pas encore active.', '#/centrale', 'Ouvrir La Centrale'],
   orders:['Mes commandes', 'Vos achats, et ceux validés grâce à votre lien d’affiliation, apparaîtront ici dès l’ouverture du suivi des commandes.', null, null],
   ads:['DropAds', 'Gagnez de l’argent en partageant des offres ou des services. Ce module ouvrira quand ses règles seront définies.', '#/m/dropads', 'En savoir plus']};
+
 async function dueInfo() {
   const r = await sb.from('contact_charges').select('amount').eq('status', 'due');
   const a = r.data || []; return {n:a.length, sum:a.reduce((t, x) => t + Number(x.amount), 0)};
 }
 function dueCard(d) {
-  return `<div class="card"><div class="row"><div><b>${d.n}</b> mise(s) en relation à régler : <b>${fcfa(d.sum)}</b><br><span class="mut">Le règlement se fait après chaque lot de 5. À 5 en attente, les nouvelles mises en relation sont bloquées.</span></div>${d.n ? '<button id="pay">Régler</button>' : ''}</div></div>`;
+  return `<div class="card act-due"><div class="row"><div><b>${d.n}</b> mise(s) en relation à régler : <b>${fcfa(d.sum)}</b><br><span class="mut">Le règlement se fait après chaque lot de 5. À 5 en attente, les nouvelles mises en relation sont bloquées.</span></div>${d.n ? '<button id="pay">Régler</button>' : ''}</div></div>`;
 }
 function bindPay(after) {
   const b = document.getElementById('pay'); if (!b) return;
   b.onclick = async () => { if (!confirm('Régler vos mises en relation depuis votre portefeuille ?')) return;
     try { const t = await q(sb.rpc('pay_contact_charges')); toast(fcfa(t) + ' réglés.'); after(); } catch (_) {} };
 }
-async function activities(tab) {
-  tab = ATABS.some(x => x[0] === tab) ? tab : 'pub';
-  app.innerHTML = `<h1>Mes activités</h1><div class="chips">${ATABS.map(([k, l]) => `<a class="btn ${tab === k ? '' : 'alt'}" href="#/activity/${k}">${l}</a>`).join('')}</div><div id="tab"></div>`;
-  const box = document.getElementById('tab');
-  if (tab === 'pub') {
-    const mine = t => sb.from(t).select('id,title,status').eq('user_id', state.me.id).order('created_at', {ascending:false}).limit(20);
-    const [o, s, p, t] = await Promise.all([mine('offers'), mine('searches'), mine('properties'), mine('transport_requests')]);
-    const all = [...(o.data || []).map(x => ({...x, k:'offer', l:'Offre'})), ...(s.data || []).map(x => ({...x, k:'search', l:'Besoin'})), ...(p.data || []).map(x => ({...x, k:'property', l:'Immobilier'})), ...(t.data || []).map(x => ({...x, k:'transport', l:'Transport'}))];
-    box.innerHTML = `<p><a class="btn" href="#/publish">Publier une offre</a><a class="btn alt" href="#/publish/search">Publier un besoin</a></p>` +
-      (all.map(x => `<a class="card row" href="#/p/${x.k}/${x.id}"><span><span class="tag">${x.l}</span>${esc(x.title)}</span><span class="tag s">${esc(STATUS[x.status] || x.status)}</span></a>`).join('') || '<p class="card mut">Vous n’avez encore rien publié.</p>');
-  } else if (tab === 'requests') {
-    const [rq, due] = await Promise.all([sb.from('contact_requests').select('*').order('created_at', {ascending:false}).limit(50), dueInfo()]);
-    const R = (rq.data || []).filter(r => r.recipient_id === state.me.id || r.requester_id === state.me.id);
-    box.innerHTML = `${dueCard(due)}
-    ${R.map(r => { const rec = r.recipient_id === state.me.id; return `<div class="card"><span class="tag">${rec ? 'Reçue' : 'Envoyée'}</span><span class="tag s">${RST[r.status]}</span> <span class="mut">${dt(r.created_at)}</span>
-     <p>${esc(r.message || '(sans message)')}</p>${r.status === 'pending' ? (rec ? `<button data-a="accepted" data-i="${r.id}">Accepter</button><button class="alt" data-a="rejected" data-i="${r.id}">Refuser</button>` : `<button class="alt" data-a="cancelled" data-i="${r.id}">Annuler</button>`) : ''}</div>`; }).join('') || '<p class="card mut">Aucune demande.</p>'}`;
-    bindPay(() => activities('requests'));
-    box.querySelectorAll('[data-a]').forEach(b => b.onclick = async () => { if (b.dataset.a === 'accepted' && !confirm('Accepter ? Des frais de mise en relation pourront être dus selon la publication.')) return;
-      try { await q(sb.from('contact_requests').update({status:b.dataset.a}).eq('id', b.dataset.i)); activities('requests'); } catch (_) {} });
-  } else if (tab === 'affil') {
-    const L = (await q(sb.from('product_leads').select('id,status,product_id,products(title)').eq('user_id', state.me.id).eq('kind', 'promote').order('created_at', {ascending:false}).limit(50))) || [];
-    const LS2 = {new:'En attente de validation', validated:'Active', refused:'Refusée'};
-    box.innerHTML = '<p class="mut">La demande d’affiliation n’est pas encore active. Vos affiliations apparaîtront ici dès son ouverture.</p>' +
-      (L.map(x => `<a class="card row" href="#/product/${x.product_id}"><span>${esc(x.products?.title)}</span><span class="tag s">${LS2[x.status]}</span></a>`).join('') || '<p class="card mut">Aucune affiliation pour le moment.</p>') + '<a class="btn" href="#/centrale">Ouvrir La Centrale</a>';
-  } else if (tab === 'products') {
-    box.innerHTML = '<a class="card" href="#/seller"><b>Mes fiches et produits</b><br><span class="mut">Créez des fiches fournisseurs, proposez des produits et traitez les demandes reçues.</span></a>';
-  } else {
-    const [t, x, h, l] = SOON[tab];
-    box.innerHTML = `<div class="card"><span class="tag s">Bientôt</span><h2 style="margin-top:8px">${t}</h2><p class="mut">${x}</p>${h ? `<a class="btn" href="${h}">${l}</a>` : ''}</div>`;
-  }
+
+// --- Statut visuel pour les publications (uniquement les statuts réels) ---
+function pubStatus(s) {
+  const label = STATUS[s] || s || '—';
+  const cls = ['pending', 'rejected', 'expired', 'fulfilled'].includes(s) ? s : '';
+  return `<span class="act-status ${cls}">${esc(label)}</span>`;
 }
+
+// --- Hub principal du volet Activité ---
+async function activityHub() {
+  const me = state.me.id;
+  const cnt = async (t, f) => {
+    let x = sb.from(t).select('*', {count:'exact', head:true});
+    if (f) x = f(x);
+    const r = await x; return r.count || 0;
+  };
+  const mineStatus = async t => {
+    const rows = (await q(sb.from(t).select('status').eq('user_id', me).limit(500))) || [];
+    return by(rows);
+  };
+  const [co, cs, cp, ct, reqRecv, reqSent, leads, aff, due] = await Promise.all([
+    mineStatus('offers'), mineStatus('searches'), mineStatus('properties'), mineStatus('transport_requests'),
+    cnt('contact_requests', x => x.eq('recipient_id', me).eq('status', 'pending')),
+    cnt('contact_requests', x => x.eq('requester_id', me).eq('status', 'pending')),
+    cnt('product_leads', x => x.eq('user_id', me).eq('status', 'new')),
+    cnt('product_leads', x => x.eq('user_id', me).eq('status', 'validated')),
+    dueInfo()
+  ]);
+  const all = {};
+  [co, cs, cp, ct].forEach(c => Object.entries(c).forEach(([k, v]) => { all[k] = (all[k] || 0) + v; }));
+  const tot = total(all);
+  const pendingPub = all.pending || 0;
+  const approvedPub = all.approved || 0;
+  const rejectedPub = all.rejected || 0;
+  const expiredPub = all.expired || 0;
+  const donePub = all.fulfilled || 0;
+  const todo = [
+    [pendingPub, 'publication(s) en attente de validation', '#/activity/publications?statut=pending'],
+    [reqRecv, 'demande(s) de relation à traiter', '#/activity/relations?onglet=recues&statut=pending'],
+    [rejectedPub, 'publication(s) refusée(s) à corriger', '#/activity/publications?statut=rejected'],
+    [leads, 'demande(s) de promotion à examiner', '#/activity/commerce?onglet=leads'],
+    [due.n > 0 ? due.n : 0, 'mise(s) en relation à régler (' + fcfa(due.sum) + ')', '#/activity/relations']
+  ].filter(x => x[0] > 0).slice(0, 4);
+
+  const tiles = [
+    ['briefcase', 'Mes publications', '#/activity/publications', `${tot} au total · ${pendingPub} en attente`],
+    ['contacts', 'Mes mises en relation', '#/activity/relations', `${reqRecv} reçue(s) · ${reqSent} envoyée(s)`],
+    ['store', 'Mon espace commercial', '#/activity/commerce', `${leads + aff} élément(s) · produits et affiliations`],
+    ['wallet', 'Mes transactions', '#/activity/transactions', 'Commandes, ventes, statuts'],
+    ['megaphone', 'Mes campagnes', '#/activity/campagnes', 'DropAds — module à venir']
+  ];
+
+  app.innerHTML = `<h1>Mon activité</h1>
+    <p class="mut" style="margin-top:-8px">Suivi de vos publications, relations, opérations commerciales et transactions.</p>
+    ${todo.length ? `<h2>À traiter</h2>${todo.map(([n, l, h]) => `<a class="card row" href="${h}"><span><b>${n}</b> ${l}</span><span class="tag s">Traiter</span></a>`).join('')}` : ''}
+    <h2>Tableau de bord</h2>
+    <div class="grid"><a class="card stat" href="#/activity/publications"><b>${approvedPub}</b><span class="mut">Publications publiées</span></a>
+      <a class="card stat" href="#/activity/publications?statut=pending"><b>${pendingPub}</b><span class="mut">En attente de validation</span></a>
+      <a class="card stat" href="#/activity/relations"><b>${reqRecv}</b><span class="mut">Demandes reçues en attente</span></a>
+      <a class="card stat" href="#/activity/commerce?onglet=affiliations"><b>${aff}</b><span class="mut">Affiliations actives</span></a>
+    </div>
+    <h2>Explorer</h2>
+    <div class="grid">${tiles.map(([i, l, h, d]) => `<a class="card act-tile" href="${h}"><span class="ico">${icon(i)}</span><b>${esc(l)}</b><span class="mut">${esc(d)}</span></a>`).join('')}</div>
+    <h2>Récapitulatif publications</h2>
+    <div class="card"><div class="row"><span>En attente</span><b>${pendingPub}</b></div>
+      <div class="row"><span>Publiées</span><b>${approvedPub}</b></div>
+      <div class="row"><span>Refusées</span><b>${rejectedPub}</b></div>
+      <div class="row"><span>Expirées</span><b>${expiredPub}</b></div>
+      <div class="row"><span>Satisfaites / clôturées</span><b>${donePub}</b></div></div>
+    ${due.n ? dueCard(due) : ''}`;
+  bindPay(activityHub);
+}
+
+// --- A. Mes publications ---
+async function activityPublications(statut) {
+  const me = state.me.id;
+  const mine = t => sb.from(t).select('id,title,status,expires_at,created_at').eq('user_id', me).order('created_at', {ascending:false}).limit(50);
+  const [o, s, p, t] = await Promise.all([mine('offers'), mine('searches'), mine('properties'), mine('transport_requests')]);
+  const all = [
+    ...(o.data || []).map(x => ({...x, k:'offer', l:'Offre'})),
+    ...(s.data || []).map(x => ({...x, k:'search', l:'Besoin'})),
+    ...(p.data || []).map(x => ({...x, k:'property', l:'Immobilier'})),
+    ...(t.data || []).map(x => ({...x, k:'transport', l:'Transport'}))
+  ].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+  const filtres = [['', 'Toutes'], ['pending', 'En attente'], ['approved', 'Publiées'], ['rejected', 'Refusées'], ['expired', 'Expirées'], ['fulfilled', 'Satisfaites']];
+  const list = all.filter(x => !statut || x.status === statut);
+  app.innerHTML = `<a class="act-crumb" href="#/activity">← Activité</a><h1>Mes publications</h1>
+    <p><a class="btn" href="#/publish">Publier une offre</a><a class="btn alt" href="#/publish/search">Publier un besoin</a></p>
+    <div class="act-filters">${filtres.map(([k, l]) => `<button class="${statut === k ? '' : 'alt'}" data-f="${k}">${l}</button>`).join('')}</div>
+    <div id="list">${list.map(x => `<a class="card row" href="#/p/${x.k}/${x.id}"><span><span class="tag">${x.l}</span>${esc(x.title)}<br><span class="mut">${x.expires_at ? 'Jusqu’au ' + dt(x.expires_at) : ''}</span></span>${pubStatus(x.status)}</a>`).join('') || `<div class="card act-empty"><b>Aucune publication dans cette catégorie.</b>Publiez une offre ou un besoin depuis les boutons ci-dessus.</div>`}</div>`;
+  app.querySelectorAll('[data-f]').forEach(b => b.onclick = () => {
+    const v = b.dataset.f;
+    activityPublications(v);
+  });
+}
+
+// --- B. Mes mises en relation ---
+async function activityRelations(onglet, statut) {
+  const me = state.me.id;
+  const rq = await q(sb.from('contact_requests').select('*').order('created_at', {ascending:false}).limit(80));
+  const all = (rq || []).filter(r => r.recipient_id === me || r.requester_id === me);
+  const due = await dueInfo();
+  onglet = onglet === 'envoyees' ? 'envoyees' : 'recues';
+  const isRecv = onglet === 'recues';
+  const base = all.filter(r => (isRecv ? r.recipient_id === me : r.requester_id === me));
+  const statuts = [['', 'Toutes'], ['pending', 'En attente'], ['accepted', 'Acceptées'], ['rejected', 'Refusées'], ['cancelled', 'Annulées']];
+  const list = base.filter(r => !statut || r.status === statut);
+  app.innerHTML = `<a class="act-crumb" href="#/activity">← Activité</a><h1>Mes mises en relation</h1>
+    ${dueCard(due)}
+    <div class="act-subtabs">
+      <button class="${onglet === 'recues' ? '' : 'alt'}" data-o="recues">Reçues (${all.filter(r => r.recipient_id === me).length})</button>
+      <button class="${onglet === 'envoyees' ? '' : 'alt'}" data-o="envoyees">Envoyées (${all.filter(r => r.requester_id === me).length})</button>
+    </div>
+    <div class="act-filters">${statuts.map(([k, l]) => `<button class="${statut === k ? '' : 'alt'}" data-f="${k}">${l}</button>`).join('')}</div>
+    <div id="list">${list.map(r => { const rec = r.recipient_id === me; return `<div class="card">
+      <div class="row"><b>${rec ? 'Reçue' : 'Envoyée'}</b><span class="act-status ${r.status}">${esc(RST[r.status] || r.status)}</span></div>
+      <span class="mut">${dt(r.created_at)}</span>
+      <p style="margin:6px 0">${esc(r.message || '(sans message)')}</p>
+      ${r.status === 'pending' ? (rec ? `<button data-a="accepted" data-i="${r.id}">Accepter</button><button class="alt" data-a="rejected" data-i="${r.id}">Refuser</button>` : `<button class="alt" data-a="cancelled" data-i="${r.id}">Annuler</button>`) : ''}
+    </div>`; }).join('') || `<div class="card act-empty"><b>Aucune demande ${isRecv ? 'reçue' : 'envoyée'}.</b>${isRecv ? 'Les demandes de mise en relation qui vous sont adressées apparaîtront ici.' : 'Vos demandes de mise en relation apparaîtront ici.'}</div>`}</div>`;
+  bindPay(() => activityRelations(onglet, statut));
+  app.querySelectorAll('[data-o]').forEach(b => b.onclick = () => activityRelations(b.dataset.o, statut));
+  app.querySelectorAll('[data-f]').forEach(b => b.onclick = () => activityRelations(onglet, b.dataset.f));
+  app.querySelectorAll('[data-a]').forEach(b => b.onclick = async () => {
+    if (b.dataset.a === 'accepted' && !confirm('Accepter ? Des frais de mise en relation pourront être dus selon la publication.')) return;
+    try { await q(sb.from('contact_requests').update({status:b.dataset.a}).eq('id', b.dataset.i)); activityRelations(onglet, statut); } catch (_) {}
+  });
+}
+
+// --- C. Mon espace commercial ---
+async function activityCommerce(onglet) {
+  const me = state.me.id;
+  onglet = onglet === 'leads' || onglet === 'affiliations' ? onglet : 'produits';
+  const leads = onglet === 'leads'
+    ? (await q(sb.from('product_leads').select('id,status,product_id,kind,created_at,products(title)').eq('user_id', me).order('created_at', {ascending:false}).limit(50))) || []
+    : [];
+  const aff = onglet === 'affiliations'
+    ? (await q(sb.from('product_leads').select('id,status,product_id,products(title)').eq('user_id', me).eq('kind', 'promote').order('created_at', {ascending:false}).limit(50))) || []
+    : [];
+  const LSTAT = {new:'En attente de validation', validated:'Active', refused:'Refusée'};
+  const tabs = [
+    ['produits', 'Produits et fiches'],
+    ['leads', 'Demandes de promotion'],
+    ['affiliations', 'Affiliations']
+  ];
+  let body = '';
+  if (onglet === 'produits') {
+    body = `<a class="card" href="#/seller"><b>Mes fiches et produits</b><br><span class="mut">Créez des fiches fournisseurs, proposez des produits et traitez les demandes reçues.</span></a>`;
+  } else if (onglet === 'leads') {
+    body = `<p class="mut">Demandes reçues sur vos produits et propositions de promotion.</p>` +
+      (leads.map(x => `<a class="card row" href="#/product/${x.product_id}"><span>${esc(x.products?.title || 'Produit')}<br><span class="mut">${dt(x.created_at)} · ${x.kind === 'promote' ? 'Promotion' : 'Contact'}</span></span><span class="tag s">${LSTAT[x.status] || x.status}</span></a>`).join('') || `<div class="card act-empty"><b>Aucune demande de promotion.</b>Les demandes adressées à vos produits apparaîtront ici.</div>`);
+  } else {
+    body = `<p class="mut">La demande d’affiliation n’est pas encore active. Vos affiliations apparaîtront ici dès son ouverture.</p>` +
+      (aff.map(x => `<a class="card row" href="#/product/${x.product_id}"><span>${esc(x.products?.title || 'Produit')}</span><span class="act-status ${x.status === 'validated' ? 'fulfilled' : x.status === 'refused' ? 'rejected' : 'pending'}">${LSTAT[x.status]}</span></a>`).join('') || `<div class="card act-empty"><b>Aucune affiliation.</b>Cette fonctionnalité sera ouverte prochainement.</div>`);
+  }
+  app.innerHTML = `<a class="act-crumb" href="#/activity">← Activité</a><h1>Mon espace commercial</h1>
+    <div class="act-subtabs">${tabs.map(([k, l]) => `<button class="${onglet === k ? '' : 'alt'}" data-o="${k}">${l}</button>`).join('')}</div>
+    ${body}`;
+  app.querySelectorAll('[data-o]').forEach(b => b.onclick = () => activityCommerce(b.dataset.o));
+}
+
+// --- D. Mes transactions ---
+async function activityTransactions() {
+  // Le code existant n'expose pas de tables `orders`/`sales` accessibles par le membre.
+  // On ne fabrique donc aucune donnée : on renvoie vers le portefeuille pour les mouvements réels.
+  app.innerHTML = `<a class="act-crumb" href="#/activity">← Activité</a><h1>Mes transactions</h1>
+    <div class="card"><span class="tag s">Bientôt disponible</span>
+      <p class="mut" style="margin:10px 0 0">Le suivi des commandes, ventes et transactions sera activé prochainement. En attendant, tous vos mouvements d’argent (gains, dépenses, retraits) sont consultables dans votre portefeuille.</p>
+      <a class="btn full" href="#/wallet">Ouvrir mon portefeuille</a></div>`;
+}
+
+// --- E. Mes campagnes ---
+function activityCampaigns() {
+  // DropAds : module 'soon' dans MODULES. On n'affiche pas de faux compteurs.
+  app.innerHTML = `<a class="act-crumb" href="#/activity">← Activité</a><h1>Mes campagnes</h1>
+    <div class="card"><span class="tag s">Bientôt</span>
+      <h2 style="margin-top:8px">DropAds</h2>
+      <p class="mut">Gagnez de l’argent en partageant des offres ou des services. Ce module ouvrira quand ses règles seront définies.</p>
+      <a class="btn full" href="#/m/dropads">En savoir plus</a></div>`;
+}
+
+// --- Routeur interne du volet Activité ---
+async function activities(sub, b) {
+  // La sous-route est dans b (3e segment), ex: #/activity/publications
+  const subRoute = (b || '').split('?')[0];
+  const params = new URLSearchParams((b || '').split('?')[1] || '');
+  if (!subRoute) return activityHub();
+  if (subRoute === 'publications') return activityPublications(params.get('statut') || '');
+  if (subRoute === 'relations') return activityRelations(params.get('onglet') || 'recues', params.get('statut') || '');
+  if (subRoute === 'commerce') return activityCommerce(params.get('onglet') || 'produits');
+  if (subRoute === 'transactions') return activityTransactions();
+  if (subRoute === 'campagnes') return activityCampaigns();
+  // Rétro-compatibilité des anciennes routes #/activity/pub, /requests, etc.
+  if (subRoute === 'pub') return activityPublications('');
+  if (subRoute === 'requests') return activityRelations('recues', '');
+  if (subRoute === 'products') return activityCommerce('produits');
+  if (subRoute === 'affil') return activityCommerce('affiliations');
+  if (subRoute === 'orders') return activityTransactions();
+  if (subRoute === 'ads') return activityCampaigns();
+  return activityHub();
+}
+
 async function notifications() {
   const nt = await q(sb.from('notifications').select('*').order('created_at', {ascending:false}).limit(60));
   app.innerHTML = `<h1>Notifications</h1>${nt.map(n => `<div class="card ${n.is_read ? '' : 'unread'}"><b>${esc(n.title)}</b><br><span class="mut">${esc(n.message || '')}</span><br><span class="mut">${dt(n.created_at)}</span></div>`).join('') || '<p class="card mut">Rien de nouveau.</p>'}`;
@@ -625,46 +832,35 @@ function soon(id) {
 }
 
 // ===== src/data/centrale-demo.js =====
-const DEMO_MODE = true;
+const DEMO_MODE = false;
 const DEMO_CATEGORIES = ['Électronique','Maison','Mode','Beauté','Agroalimentaire','Bureautique'];
-const DEMO_WA = '22600000000'; // numéro fictif de démonstration
-const DEMO_PRODUCTS = [
-  {id:'p1', title:'Ventilateur rechargeable 12"', category:'Électronique', price:18500, commission:1500, certified:true, availability:'in_stock', sup:'Ouaga Centre', image:'', description:'Ventilateur silencieux, batterie 6h, idéal en saison chaude.', conditions:'Garantie 3 mois. Retrait à Ouagadougou.'},
-  {id:'p2', title:'Mixeur manuel 5 vitesses', category:'Maison', price:9500, commission:800, certified:false, availability:'in_stock', sup:'Maison+', image:'', description:'Mixeur manuel compact, bol 1L, 5 vitesses.', conditions:'Pas de garantie. Livraison possible.'},
-  {id:'p3', title:'Sac à main cuir PU', category:'Mode', price:12500, commission:1200, certified:true, availability:'limited', sup:'Mode Faso', image:'', description:'Sac à main tendance, cuir PU, 3 coloris.', conditions:'Stock limité. Paiement à la livraison.'},
-  {id:'p4', title:'Savon noir africain 250g', category:'Beauté', price:2500, commission:300, certified:false, availability:'in_stock', sup:'Karité', image:'', description:'Savon noir traditionnel, karité et cendre.', conditions:'Lot de 10 minimum pour la revente.'},
-  {id:'p5', title:'Riz local 25kg', category:'Agroalimentaire', price:16000, commission:1000, certified:true, availability:'in_stock', sup:'Bobo', image:'', description:'Riz local parfumé, sac 25kg.', conditions:'Retrait à Bobo-Dioulasso.'},
-  {id:'p6', title:'Imprimante thermique BT', category:'Bureautique', price:45000, commission:3500, certified:true, availability:'unconfirmed', sup:'Tech', image:'', description:'Imprimante thermique Bluetooth, tickets 58mm.', conditions:'Disponibilité à confirmer. Garantie 6 mois.'},
-  {id:'p7', title:'Chaussures enfant (paire)', category:'Mode', price:6500, commission:600, certified:false, availability:'in_stock', sup:'Mode Faso', image:'', description:'Chaussures enfant, tailles 24-34.', conditions:'Paiement à la commande.'},
-  {id:'p8', title:'Miel pur 1L', category:'Agroalimentaire', price:7500, commission:700, certified:true, availability:'limited', sup:'Plateau', image:'', description:'Miel pur de brousse, pot 1L.', conditions:'Stock limité. Retrait à Ouaga.'}
-];
-const DEMO_REVIEWS = {
-  p1:[{n:'Issa K.', r:5, t:'Très bon produit, mes clients sont satisfaits.', d:'2026-11-10'}, {n:'Aïcha T.', r:4, t:'Bonne commission, livraison rapide.', d:'2026-11-03'}],
-  p3:[{n:'Mariam S.', r:5, t:'Se revend facilement, belle qualité.', d:'2026-11-12'}],
-  p5:[{n:'Paul O.', r:4, t:'Riz apprécié, retrait simple à Bobo.', d:'2026-10-28'}, {n:'Fatou D.', r:3, t:'Bien, mais stock parfois court.', d:'2026-10-20'}]
-};
+const DEMO_WA = '22600000000';
+const DEMO_PRODUCTS = [];
+const DEMO_REVIEWS = {};
 
 // ===== src/services/centrale.js =====
 const centraleService = (() => {
-  const wait = ms => new Promise(r => setTimeout(r, ms));
-  const avg = id => { const l = DEMO_REVIEWS[id] || []; return l.length ? l.reduce((a, x) => a + x.r, 0) / l.length : 0; };
-  async function listProducts({q = '', category = ''} = {}) {
-    await wait(180);
-    if (!DEMO_MODE) throw new Error('Backend non branché');
-    let rows = DEMO_PRODUCTS.slice();
-    if (category) rows = rows.filter(r => r.category === category);
-    if (q) { const t = q.toLowerCase(); rows = rows.filter(r => r.title.toLowerCase().includes(t) || r.description.toLowerCase().includes(t)); }
-    rows.sort((a, b) => (b.certified ? 1 : 0) - (a.certified ? 1 : 0));
-    return rows.map(r => ({...r, rating:avg(r.id), reviews:(DEMO_REVIEWS[r.id] || []).length}));
+  const SEL = 'id,title,description,category,price,commission,availability,suppliers(display_name,certified,city)';
+  const shape = r => ({id:r.id, title:r.title, description:r.description || '', category:r.category || '', price:Number(r.price), commission:Number(r.commission),
+    availability:r.availability, sup:r.suppliers?.display_name || 'Fournisseur', city:r.suppliers?.city || '', certified:!!r.suppliers?.certified,
+    image:'', conditions:'', rating:0, reviews:0});
+  async function listProducts({q:term = '', category = ''} = {}) {
+    let x = sb.from('products').select(SEL).eq('status', 'active').order('created_at', {ascending:false}).limit(60);
+    if (category) x = x.eq('category', category);
+    const t = term.replace(/[%,()*]/g, ' ').trim();
+    if (t) x = x.or(`title.ilike.%${t}%,description.ilike.%${t}%`);
+    return ((await q(x)) || []).map(shape);
   }
-  async function listCategories() { await wait(60); return DEMO_CATEGORIES.slice(); }
+  async function listCategories() {
+    const rows = (await q(sb.from('products').select('category').eq('status', 'active').limit(200))) || [];
+    return [...new Set(rows.map(r => (r.category || '').trim()).filter(Boolean))].sort();
+  }
   async function getProduct(id) {
-    await wait(80); const p = DEMO_PRODUCTS.find(x => x.id === id);
-    return p ? {...p, rating:avg(id), reviews:(DEMO_REVIEWS[id] || []).length} : null;
+    const r = await q(sb.from('products').select(SEL).eq('id', id).eq('status', 'active').maybeSingle());
+    return r ? shape(r) : null;
   }
-  async function listReviews(id) { await wait(60); return (DEMO_REVIEWS[id] || []).slice(); }
-  // Démo : l'avis n'est conservé que dans cette session (aucun enregistrement serveur)
-  async function addReview(id, r, t) { (DEMO_REVIEWS[id] = DEMO_REVIEWS[id] || []).unshift({n:'Vous', r, t, d:new Date().toISOString().slice(0, 10)}); }
+  async function listReviews() { return []; }
+  async function addReview() {}
   return { listProducts, listCategories, getProduct, listReviews, addReview };
 })();
 
@@ -726,7 +922,7 @@ async function catalogue() {
 }
 
 // ===== src/pages/centrale/product.js =====
-const ctPrev = {}; // aperçu démo des états, par produit
+const ctPrev = {};
 async function centraleProduct(id) {
   id = decodeURIComponent(id);
   app.innerHTML = `<a href="#/centrale">← La Centrale</a>${ctBanner()}${ctLoading()}`;
@@ -734,6 +930,10 @@ async function centraleProduct(id) {
     const p = await centraleService.getProduct(id);
     if (!p) { app.innerHTML = `<a href="#/centrale">← La Centrale</a>${ctBanner()}<p class="card">Produit introuvable.</p>`; return; }
     const st = ctPrev[id] = ctPrev[id] || {c:'none', a:'none'};
+    if (!DEMO_MODE && !st.loaded) { st.loaded = true;
+      const pc = await sb.from('supplier_contacts').select('product_id').eq('user_id', state.me.id).eq('product_id', id).maybeSingle();
+      if (pc.data) { const r = await sb.rpc('contact_supplier', {p_product_id:id}); const c = r.data && r.data[0];
+        if (c) { st.c = 'paid'; st.wa = norm(c.whatsapp || ''); st.ph = c.phone || ''; } } }
     const initial = (p.title || '?').trim().charAt(0).toUpperCase();
     app.innerHTML = `<a href="#/centrale">← La Centrale</a>${ctBanner()}
       <h1>${esc(p.title)}</h1>
@@ -742,22 +942,22 @@ async function centraleProduct(id) {
       <div class="card"><div class="row"><b style="font-size:1.35rem">${fcfa(p.price)}</b><span class="ct-gain">Vous gagnez ${fcfa(p.commission)}</span></div>
         <p style="margin:10px 0 0">${esc(p.description)}</p>
         ${p.conditions ? `<p class="mut" style="margin-top:10px"><b>Conditions :</b> ${esc(p.conditions)}</p>` : ''}
-        <p class="mut" style="margin-top:10px">Fournisseur : <b>${esc(p.sup)}</b> · ses coordonnées sont sur sa fiche</p></div>
+        <p class="mut" style="margin-top:10px">Fournisseur : <b>${esc(p.sup)}</b>${p.city ? ' · ' + esc(p.city) : ''} · ses coordonnées sont sur sa fiche</p></div>
       <div id="ctact"></div>
       <h2>Comment ça marche</h2>
-      <div class="ct-steps ct-steps4"><span><b>1</b> Je promeus</span><span><b>2</b> Le client paie DropAffy</span><span><b>3</b> L’ambassadeur valide</span><span><b>4</b> Je suis payé</span></div>
+      <div class="ct-steps ct-steps4"><span><b>1</b> Je promeus</span><span><b>2</b> Le client paie DropAffy</span><span><b>3</b> La vente est validée</span><span><b>4</b> Je suis payé</span></div>
       <div id="ctrev"></div>
       ${DEMO_MODE ? '<div class="ct-prev"><b>Aperçu démo des états</b><div class="mut">Contact</div><div class="ct-cats" id="pc"></div></div>' : ''}`;
     const act = document.getElementById('ctact');
     function drawAct() {
       const C = {
         none:`<button class="full" id="ctc">Contacter le fournisseur · 100 FCFA</button>`,
-        paid:`<div class="card"><span class="tag ct-cert">Contact réglé</span><p class="mut" style="margin:6px 0 10px">Coordonnées de ${esc(p.sup)}.</p><a class="btn full" href="https://wa.me/${st.wa || DEMO_WA}" target="_blank" rel="noopener">Écrire sur WhatsApp</a></div>`};
+        paid:`<div class="card"><span class="tag ct-cert">Contact réglé</span><p class="mut" style="margin:6px 0 10px">Coordonnées de ${esc(p.sup)}.</p>${(st.wa || DEMO_MODE) ? `<a class="btn full" href="https://wa.me/${st.wa || DEMO_WA}" target="_blank" rel="noopener">Écrire sur WhatsApp</a>` : ''}${st.ph ? `<a class="btn alt full" href="tel:${esc(st.ph)}">Appeler ${esc(st.ph)}</a>` : ''}</div>`};
       act.innerHTML = C[st.c === 'paid' ? 'paid' : 'none'] + `<div class="card"><span class="tag s">Bientôt disponible</span><p class="mut" style="margin:6px 0 0">La demande d’affiliation n’est pas encore active.</p></div>`;
       const c = document.getElementById('ctc');
       if (c) c.onclick = async () => { if (!confirm('Débiter 100 FCFA de votre portefeuille pour afficher les coordonnées du fournisseur ?')) return;
         if (DEMO_MODE) { st.c = 'paid'; st.wa = DEMO_WA; drawAct(); drawPrev(); return; }
-        try { const r = await q(sb.rpc('contact_supplier', {p_product_id:id})); st.c = 'paid'; st.wa = norm((r && r[0] ? r[0].whatsapp : '') || ''); drawAct(); } catch (_) {} };
+        try { const r = await q(sb.rpc('contact_supplier', {p_product_id:id})); st.c = 'paid'; st.wa = norm((r && r[0] ? r[0].whatsapp : '') || ''); st.ph = (r && r[0] ? r[0].phone : '') || ''; drawAct(); } catch (_) {} };
     }
     function drawPrev() {
       const pc = document.getElementById('pc'); if (!pc) return;
@@ -777,7 +977,7 @@ async function centraleProduct(id) {
         await centraleService.addReview(id, Number(document.getElementById('rn').value), document.getElementById('rt').value.trim());
         toast('Merci pour votre avis.'); drawRev(); };
     }
-    drawAct(); drawPrev(); drawRev();
+    drawAct(); drawPrev(); if (DEMO_MODE) drawRev();
   } catch (_) {
     app.innerHTML = `<a href="#/centrale">← La Centrale</a>${ctBanner()}<p class="card">Impossible de charger ce produit.</p>`;
   }
