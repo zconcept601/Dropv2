@@ -218,6 +218,24 @@ function product() { comingSoon('Produit', '#/centrale'); }
 function immobilier() { comingSoon('Immobilier', '#/opportunities'); }
 function transport() { comingSoon('Transport', '#/opportunities'); }
 function seller() { comingSoon('Mes fiches et produits', '#/profile'); }
+async function adminFinance() {
+  const [pos, mo, ex] = await Promise.all([q(sb.rpc('finance_position')), q(sb.rpc('finance_monthly', {p_months:6})), q(sb.from('finance_expenses').select('period,label,amount').order('period', {ascending:false}).limit(10))]);
+  const p = (pos || [])[0] || {}, M = mo || [], cur = new Date().toISOString().slice(0, 7);
+  const st = (v, l) => `<div class="card stat"><b>${fcfa(v)}</b><span class="mut">${l}</span></div>`;
+  app.innerHTML = `<a href="#/admin">← Administration</a><h1>Pilotage financier</h1>
+  <div class="grid">${st(p.commissions_dues, 'Commissions dues')}${st(p.soldes_portefeuilles, 'Fonds clients (hors revenus)')}${st(p.reserve_actuelle, 'Réserve actuelle')}${st(p.charges_mensuelles, 'Seuil de survie / mois')}</div>
+  <div class="card"><b>Réserve cible</b><p class="mut">1 mois : ${fcfa(p.reserve_cible_1_mois)} · 3 mois : ${fcfa(p.reserve_cible_3_mois)} · 6 mois : ${fcfa(p.reserve_cible_6_mois)}<br>Couverture actuelle : ${p.couverture_mois ?? 0} mois · Objectif de revenus : ${fcfa(p.objectif_revenus)}</p></div>
+  <h2>Mois par mois</h2>${M.map(m => { const ended = m.mois.slice(0, 7) < cur, can = ended && Number(m.reserve_suggeree) > 0 && Number(m.reserve_allouee) === 0;
+    return `<div class="card"><b>${m.mois.slice(0, 7)}</b> <span class="tag${Number(m.disponible) < 0 ? ' s' : ''}">Disponible ${fcfa(m.disponible)}</span>
+    <p class="mut">Encaissé ${fcfa(m.revenus_encaisses)} (abonnements ${fcfa(m.abonnements_fournisseurs)}, contacts ${fcfa(m.contacts_encaisses)}, ambassadeurs ${fcfa(m.abonnements_ambassadeurs)})<br>Commissions d’abonnement ${fcfa(m.commissions_abonnements)} · Charges ${fcfa(m.charges)} (${esc(m.charges_source)})<br>Part plateforme sur ventes, non encaissée : ${fcfa(m.part_plateforme_ventes_non_encaissee)}</p>
+    ${Number(m.reserve_allouee) > 0 ? `<span class="tag">Réserve affectée : ${fcfa(m.reserve_allouee)}</span>` : can ? `<button data-r="${m.mois}">Affecter ${fcfa(m.reserve_suggeree)} à la réserve</button>` : ''}</div>`; }).join('')}
+  <h2>Ajouter une charge</h2><form id="xf" class="card"><label>Mois<input name="period" type="month" value="${cur}" required></label><label>Libellé<input name="label" required></label><label>Montant (FCFA)<input name="amount" type="number" min="1" required></label><button class="full">Enregistrer</button></form>
+  ${(ex || []).map(x => `<div class="card row"><span>${esc(x.label)}<br><span class="mut">${x.period.slice(0, 7)}</span></span><b>${fcfa(x.amount)}</b></div>`).join('')}`;
+  app.querySelectorAll('[data-r]').forEach(b => b.onclick = async () => { if (!confirm('Affecter la part de réserve de ce mois ?')) return;
+    try { await q(sb.rpc('finance_allocate_reserve', {p_period:b.dataset.r})); toast('Réserve affectée.'); adminFinance(); } catch (_) {} });
+  document.getElementById('xf').onsubmit = async e => { e.preventDefault(); const v = Object.fromEntries(new FormData(e.target));
+    try { await q(sb.from('finance_expenses').insert({period:v.period + '-01', label:v.label.trim(), amount:Number(v.amount)})); toast('Charge enregistrée.'); adminFinance(); } catch (_) {} };
+}
 function adminCentrale() { comingSoon('Administration La Centrale', '#/admin'); }
 
 // ===== src/services/auth.js =====
@@ -361,7 +379,7 @@ function publish(kind,txt){
   <label>Titre<input id="ti" required maxlength="120"></label><label>Description<textarea id="d" rows="5" required></textarea></label>
   <label>Catégorie<input id="c" placeholder="Électroménager, transport…"></label><label>Ville<input id="v" placeholder="Ouagadougou"></label>
   <button class="full">Envoyer pour validation</button>
-  <p class="mut">Pas d’annonce immobilière, de produit pour La Centrale ni de recherche d’emploi. Une fois validée, la publication reste visible 2 jours.</p></form>`;
+  <p class="mut">Pas d’annonce immobilière, de produit pour La Centrale ni de recherche d’emploi. Une fois validée, la publication reste visible 5 jours.</p></form>`;
   if(kind==='search')document.getElementById('t').value='search';if(txt)document.getElementById('ti').value=decodeURIComponent(txt);
   document.getElementById('f').onsubmit=async e=>{e.preventDefault();
     if(document.getElementById('t').value==='search'&&!forced){
@@ -412,6 +430,18 @@ const SOON = {
   affil:['Mes affiliations', 'Les produits que vous promouvez et les commissions de vos ventes apparaîtront ici. Pour commencer, demandez à promouvoir un produit depuis La Centrale.', '#/centrale', 'Ouvrir La Centrale'],
   orders:['Mes commandes', 'Vos achats, et ceux validés grâce à votre lien d’affiliation, apparaîtront ici dès l’ouverture du suivi des commandes.', null, null],
   ads:['DropAds', 'Gagnez de l’argent en partageant des offres ou des services. Ce module ouvrira quand ses règles seront définies.', '#/m/dropads', 'En savoir plus']};
+async function dueInfo() {
+  const r = await sb.from('contact_charges').select('amount').eq('status', 'due');
+  const a = r.data || []; return {n:a.length, sum:a.reduce((t, x) => t + Number(x.amount), 0)};
+}
+function dueCard(d) {
+  return `<div class="card"><div class="row"><div><b>${d.n}</b> mise(s) en relation à régler : <b>${fcfa(d.sum)}</b><br><span class="mut">Le règlement se fait après chaque lot de 5. À 5 en attente, les nouvelles mises en relation sont bloquées.</span></div>${d.n ? '<button id="pay">Régler</button>' : ''}</div></div>`;
+}
+function bindPay(after) {
+  const b = document.getElementById('pay'); if (!b) return;
+  b.onclick = async () => { if (!confirm('Régler vos mises en relation depuis votre portefeuille ?')) return;
+    try { const t = await q(sb.rpc('pay_contact_charges')); toast(fcfa(t) + ' réglés.'); after(); } catch (_) {} };
+}
 async function activities(tab) {
   tab = ATABS.some(x => x[0] === tab) ? tab : 'pub';
   app.innerHTML = `<h1>Mes activités</h1><div class="chips">${ATABS.map(([k, l]) => `<a class="btn ${tab === k ? '' : 'alt'}" href="#/activity/${k}">${l}</a>`).join('')}</div><div id="tab"></div>`;
@@ -423,14 +453,13 @@ async function activities(tab) {
     box.innerHTML = `<p><a class="btn" href="#/publish">Publier une offre</a><a class="btn alt" href="#/publish/search">Publier un besoin</a></p>` +
       (all.map(x => `<a class="card row" href="#/p/${x.k}/${x.id}"><span><span class="tag">${x.l}</span>${esc(x.title)}</span><span class="tag s">${esc(STATUS[x.status] || x.status)}</span></a>`).join('') || '<p class="card mut">Vous n’avez encore rien publié.</p>');
   } else if (tab === 'requests') {
-    const [rq, qt] = await Promise.all([sb.from('contact_requests').select('*').order('created_at', {ascending:false}).limit(50), sb.from('contact_quotas').select('credits').maybeSingle()]);
+    const [rq, due] = await Promise.all([sb.from('contact_requests').select('*').order('created_at', {ascending:false}).limit(50), dueInfo()]);
     const R = (rq.data || []).filter(r => r.recipient_id === state.me.id || r.requester_id === state.me.id);
-    box.innerHTML = `<div class="card"><div class="row"><div><b>${qt.data?.credits ?? 0}</b> mises en relation restantes<br><span class="mut">Au-delà : 100 FCFA pour 5 de plus</span></div><button id="buy">Payer 100 FCFA</button></div></div>
+    box.innerHTML = `${dueCard(due)}
     ${R.map(r => { const rec = r.recipient_id === state.me.id; return `<div class="card"><span class="tag">${rec ? 'Reçue' : 'Envoyée'}</span><span class="tag s">${RST[r.status]}</span> <span class="mut">${dt(r.created_at)}</span>
      <p>${esc(r.message || '(sans message)')}</p>${r.status === 'pending' ? (rec ? `<button data-a="accepted" data-i="${r.id}">Accepter</button><button class="alt" data-a="rejected" data-i="${r.id}">Refuser</button>` : `<button class="alt" data-a="cancelled" data-i="${r.id}">Annuler</button>`) : ''}</div>`; }).join('') || '<p class="card mut">Aucune demande.</p>'}`;
-    document.getElementById('buy').onclick = async () => { if (!confirm('Débiter 100 FCFA de votre portefeuille pour 5 mises en relation ?')) return;
-      try { await q(sb.rpc('buy_contact_credits')); toast('5 mises en relation ajoutées.'); activities('requests'); } catch (_) {} };
-    box.querySelectorAll('[data-a]').forEach(b => b.onclick = async () => { if (b.dataset.a === 'accepted' && !confirm('Accepter ? Un crédit de mise en relation sera utilisé.')) return;
+    bindPay(() => activities('requests'));
+    box.querySelectorAll('[data-a]').forEach(b => b.onclick = async () => { if (b.dataset.a === 'accepted' && !confirm('Accepter ? Des frais de mise en relation pourront être dus selon la publication.')) return;
       try { await q(sb.from('contact_requests').update({status:b.dataset.a}).eq('id', b.dataset.i)); activities('requests'); } catch (_) {} });
   } else if (tab === 'affil') {
     const L = (await q(sb.from('product_leads').select('id,status,product_id,products(title)').eq('user_id', state.me.id).eq('kind', 'promote').order('created_at', {ascending:false}).limit(50))) || [];
@@ -486,10 +515,10 @@ async function evolution() {
 let filt = 'all';
 const WSTAT = {pending:'En attente', paid:'Payé', rejected:'Refusé', cancelled:'Annulé'};
 async function wallet() {
-  const [d, tx, cm, wd] = await Promise.all([q(sb.rpc('member_dashboard')),
+  const [d, tx, cm, wd, due] = await Promise.all([q(sb.rpc('member_dashboard')),
     sb.from('wallet_transactions').select('*').order('created_at', {ascending:false}).limit(50),
     sb.from('commission_ledger').select('*').order('created_at', {ascending:false}).limit(50),
-    sb.from('withdrawal_requests').select('*').order('created_at', {ascending:false}).limit(30)]);
+    sb.from('withdrawal_requests').select('*').order('created_at', {ascending:false}).limit(30), dueInfo()]);
   const rows = [...(cm.data || []).map(c => ({t:'gain', date:c.created_at, label:'Commission · 40 % d’un abonnement fournisseur', amt:c.amount, st:'Validé', ok:true})),
     ...(tx.data || []).map(x => ({t:['payment', 'debit'].includes(x.transaction_type) ? 'spend' : 'recharge', date:x.created_at, label:x.description || x.transaction_type, amt:x.amount, st:x.status === 'completed' ? 'Terminé' : x.status, ok:x.status === 'completed'})),
     ...(wd.data || []).map(x => ({t:'withdraw', date:x.created_at, label:'Retrait ' + (x.method === 'orange_money' ? 'Orange Money' : 'Moov Money'), amt:x.amount, st:WSTAT[x.status], ok:x.status === 'paid'}))]
@@ -505,7 +534,7 @@ async function wallet() {
    <label>Moyen<select name="method"><option value="orange_money">Orange Money</option><option value="moov_money">Moov Money</option></select></label>
    <label>Numéro<input name="phone" type="tel" required></label><button class="full">Demander le retrait</button></form>`
    : `<div class="card" style="margin-top:12px"><b>Retirer mes gains</b><p class="mut">Il vous faut au moins ${fcfa(d.min_withdrawal)} de gains retirables. Vous avez ${fcfa(d.withdrawable)}.</p></div>`}
-  <div class="card row"><span><b>${d.contact_credits}</b> mises en relation restantes<br><span class="mut">100 FCFA pour 5 de plus</span></span><button id="buy">Payer</button></div>
+  ${dueCard(due)}
   ${(wd.data || []).filter(x => x.status === 'pending').map(x => `<div class="card row"><span>Retrait de <b>${fcfa(x.amount)}</b><br><span class="mut">${dt(x.created_at)} · en attente</span></span><button class="alt" data-c="${x.id}">Annuler</button></div>`).join('')}
   <h2>Historique financier</h2><div class="chips">${F.map(([k, l]) => `<button class="${filt === k ? '' : 'alt'}" data-f="${k}">${l}</button>`).join('')}</div>
   ${show.map(r => `<div class="card row"><span>${esc(r.label)}<br><span class="mut">${dt(r.date)} · ${esc(r.st)}</span></span><b>${SG[r.t]}${fcfa(r.amt)}</b></div>`).join('') || '<p class="card mut">Aucune opération.</p>'}`;
@@ -513,8 +542,7 @@ async function wallet() {
   if (f) f.onsubmit = async e => { e.preventDefault(); const v = Object.fromEntries(new FormData(f));
     if (!confirm(`Demander le retrait de ${fcfa(Number(v.amount))} sur ${v.phone} ?`)) return;
     try { await q(sb.rpc('request_withdrawal', {p_amount:Number(v.amount), p_method:v.method, p_phone:v.phone})); toast('Demande de retrait enregistrée.'); wallet(); } catch (_) {} };
-  document.getElementById('buy').onclick = async () => { if (!confirm('Débiter 100 FCFA de votre portefeuille pour 5 mises en relation ?')) return;
-    try { await q(sb.rpc('buy_contact_credits')); toast('5 mises en relation ajoutées.'); wallet(); } catch (_) {} };
+  bindPay(wallet);
   app.querySelectorAll('[data-f]').forEach(b => b.onclick = () => { filt = b.dataset.f; wallet(); });
   app.querySelectorAll('[data-c]').forEach(b => b.onclick = async () => { if (!confirm('Annuler cette demande de retrait ?')) return;
     try { await q(sb.rpc('cancel_withdrawal', {p_id:b.dataset.c})); wallet(); } catch (_) {} });
@@ -542,11 +570,12 @@ async function profile(){
 
 // ===== src/pages/admin.js =====
 async function admin(){
-  const [o,s,m,l,pr,tr,wd]=await Promise.all([sb.from('offers').select('*').eq('status','pending'),sb.from('searches').select('*').eq('status','pending'),
-    sb.from('profiles').select('id,full_name,phone,account_status').order('created_at',{ascending:false}).limit(50),sb.from('admin_logs').select('*').order('created_at',{ascending:false}).limit(15),sb.from('properties').select('*').eq('status','pending'),sb.from('transport_requests').select('*').eq('status','pending'),sb.from('withdrawal_requests').select('*,profiles!withdrawal_requests_user_id_fkey(full_name)').eq('status','pending').order('created_at')]);
+  const [o,s,m,l,pr,tr,wd,tf]=await Promise.all([sb.from('offers').select('*').eq('status','pending'),sb.from('searches').select('*').eq('status','pending'),
+    sb.from('profiles').select('id,full_name,phone,account_status').order('created_at',{ascending:false}).limit(50),sb.from('admin_logs').select('*').order('created_at',{ascending:false}).limit(15),sb.from('properties').select('*').eq('status','pending'),sb.from('transport_requests').select('*').eq('status','pending'),sb.from('withdrawal_requests').select('*,profiles!withdrawal_requests_user_id_fkey(full_name)').eq('status','pending').order('created_at'),sb.from('tarifs').select('code,amount')]);
+  const TF=Object.fromEntries((tf.data||[]).map(t=>[t.code,t.amount]));
   const P=[...(o.data||[]).map(x=>({...x,k:'offer'})),...(s.data||[]).map(x=>({...x,k:'search'})),...(pr.data||[]).map(x=>({...x,k:'property'})),...(tr.data||[]).map(x=>({...x,k:'transport'}))];
-  app.innerHTML=`<a href="#/profile">← Profil</a><h1>Administration</h1><a class="card" href="#/admin/centrale"><b>La Centrale</b><br><span class="mut">Fournisseurs, produits et demandes des membres</span></a><h2>À valider (${P.length})</h2>
-  ${P.map(x=>`<div class="card"><span class="tag${x.k==='search'?' s':''}">${{offer:'Offre',search:'Recherche',property:'Immobilier',transport:'Transport'}[x.k]}</span><b>${esc(x.title)}</b><p class="mut">${esc(x.description)}</p>${x.k==='search'?`<p class="mut">La Centrale : ${x.centrale_matches||0} produit(s) correspondant(s)</p>`:''}
+  app.innerHTML=`<a href="#/profile">← Profil</a><h1>Administration</h1><a class="card" href="#/admin/centrale"><b>La Centrale</b><br><span class="mut">Fournisseurs, produits et demandes des membres</span></a><a class="card" href="#/admin/finance"><b>Pilotage financier</b><br><span class="mut">Commissions dues, charges, réserve</span></a><h2>À valider (${P.length})</h2>
+  ${P.map(x=>`<div class="card"><span class="tag${x.k==='search'?' s':''}">${{offer:'Offre',search:'Recherche',property:'Immobilier',transport:'Transport'}[x.k]}</span><b>${esc(x.title)}</b><p class="mut">${esc(x.description)}</p>${x.k==='search'?`<p class="mut">La Centrale : ${x.centrale_matches||0} produit(s) correspondant(s) · contact à ${fcfa((x.centrale_matches||0)>=3?TF.communaute_need_centrale_contact:TF.communaute_contact)}</p>`:x.k==='offer'?`<p class="mut">Contact à ${fcfa(TF.communaute_contact)}, ou ${fcfa(TF.communaute_offer_in_centrale_contact)} si l’offre est déjà dans La Centrale</p>`:''}
    <button data-m="approved" data-k="${x.k}" data-i="${x.id}">Valider</button><button class="bad" data-m="rejected" data-k="${x.k}" data-i="${x.id}">Refuser</button></div>`).join('')||'<p class="card mut">Rien en attente.</p>'}
   <h2>Retraits à traiter (${(wd.data||[]).length})</h2>${(wd.data||[]).map(x=>`<div class="card"><b>${new Intl.NumberFormat('fr-FR').format(x.amount)} FCFA</b> <span class="tag">${x.method==='orange_money'?'Orange Money':'Moov Money'}</span><br><span class="mut">${esc(x.profiles?.full_name)} · ${esc(x.phone)} · ${esc(x.reference)}</span><br>
    <button data-w="paid" data-i="${x.id}">Marquer payé</button><button class="bad" data-w="rejected" data-i="${x.id}">Refuser</button></div>`).join('')||'<p class="card mut">Aucun retrait en attente.</p>'}
@@ -555,7 +584,8 @@ async function admin(){
   <h2>Journal</h2>${(l.data||[]).map(x=>`<div class="card mut">${dt(x.created_at)} · ${esc(x.action)}</div>`).join('')}`;
   app.querySelectorAll('[data-m]').forEach(b=>b.onclick=async()=>{let why=null;
     if(b.dataset.m==='rejected'){why=prompt('Motif du refus ?');if(!why)return}
-    try{await q(sb.rpc('admin_moderate_publication',{p_type:b.dataset.k,p_id:b.dataset.i,p_decision:b.dataset.m,p_reason:why}));admin()}catch(_){}});
+    const inC=b.dataset.m==='approved'&&b.dataset.k==='offer'&&confirm('Cette offre est-elle déjà présente dans La Centrale ?\nOK = oui, Annuler = non');
+    try{await q(sb.rpc('admin_moderate_publication',{p_type:b.dataset.k,p_id:b.dataset.i,p_decision:b.dataset.m,p_reason:why,p_in_centrale:inC}));admin()}catch(_){}});
   app.querySelectorAll('[data-cr]').forEach(b=>b.onclick=async()=>{const a=parseInt(prompt('Montant en FCFA ?'),10),ref=prompt('Référence du paiement reçu ?');if(!a||!ref)return;
     try{await q(sb.rpc('admin_credit_wallet',{p_user_id:b.dataset.cr,p_amount:a,p_reference:ref}));toast('Portefeuille crédité.');admin()}catch(_){}});
   app.querySelectorAll('[data-w]').forEach(b=>b.onclick=async()=>{let note=null;
@@ -743,7 +773,7 @@ async function centraleProduct(id) {
 
 // ===== src/main.js =====
 const ROUTES = {'':home, opportunities, community, publish, contacts, activity:activities, notifications, evolution, wallet, profile,
-  admin:a => a === 'centrale' ? adminCentrale() : admin(), p:detail, m:soon, centrale:centraleRoot, product, immobilier, transport, seller};
+  admin:a => a === 'centrale' ? adminCentrale() : a === 'finance' ? adminFinance() : admin(), p:detail, m:soon, centrale:centraleRoot, product, immobilier, transport, seller};
 
 async function centraleRoot(a, b) {
   if (!a) return catalogue();
