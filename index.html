@@ -3,119 +3,158 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#1553B6">
+<meta name="theme-color" content="#1F5BFF">
 <title>DropAffy</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <script>
 window.addEventListener('error',e=>{document.body.insertAdjacentHTML('afterbegin','<pre style="padding:12px;color:#b00;white-space:pre-wrap">Erreur : '+e.message+'</pre>')});
 </script>
 <style>
-:root{color-scheme:light dark;--bg:#F3F5FB;--surface:#fff;--ink:#0B1530;--mut:#66728A;--line:#E4E9F4;--brand:#2455F4;--brand2:#5B7CFF;--tint:#E8EEFF;--sun:#FFB020;--bad:#D92D3A;--g:var(--brand);--sh:0 1px 2px rgba(11,21,48,.05),0 10px 28px rgba(11,21,48,.07)}
-@media(prefers-color-scheme:dark){:root{--bg:#0A0F1F;--surface:#121A33;--ink:#EEF2FF;--mut:#97A3C2;--line:#1F2A4A;--tint:#1A2650;--brand:#5B7CFF;--sh:0 1px 2px rgba(0,0,0,.4)}}
+/* ===== DropAffy — Modern Business Marketplace (refonte visuelle, CSS uniquement) ===== */
+:root{color-scheme:light dark;--bg:#F1F5FB;--surface:#fff;--ink:#0F1A33;--mut:#5B6780;--line:#E1E7F2;--brand:#1F5BFF;--brand2:#5B7CFF;--btn:#1F5BFF;--hero:#1747D6;--tint:#EAF0FF;--sun:#F59E0B;--bad:#D92D3A;--g:var(--brand);--amb-bg:#FFF4DB;--amb-ink:#8A5300;--ok-bg:#E6F6EE;--ok-ink:#0B6B45;--sh:0 1px 2px rgba(15,26,51,.05)}
+@media(prefers-color-scheme:dark){:root{--bg:#0A1022;--surface:#121A33;--ink:#EEF2FF;--mut:#9AA6C4;--line:#222E52;--brand:#7C9AFF;--btn:#3562F5;--hero:#1B3FC7;--tint:#1A2650;--amb-bg:#2A2210;--amb-ink:#FFD98A;--ok-bg:#0E2E1C;--ok-ink:#8FE7B8;--sh:none}}
 *{box-sizing:border-box}
-body{margin:0;color:var(--ink);font:16px/1.5 'Plus Jakarta Sans',system-ui,sans-serif;padding-bottom:112px;background:radial-gradient(900px 380px at 50% -140px,#cfdcff55,transparent),var(--bg);-webkit-font-smoothing:antialiased}
-main{max-width:600px;margin:0 auto;padding:20px 16px}
-h1{font-size:1.75rem;letter-spacing:-.025em;margin:6px 0 16px;font-weight:800;line-height:1.15}
-h2{font-size:1.05rem;margin:26px 0 10px;font-weight:800;letter-spacing:-.01em}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;color:var(--ink);background:var(--bg);font:16px/1.5 'Plus Jakarta Sans',system-ui,sans-serif;padding-bottom:calc(92px + env(safe-area-inset-bottom));-webkit-font-smoothing:antialiased;overflow-x:clip}
+main{max-width:600px;min-width:0;margin:0 auto;padding:18px 16px}
+img{max-width:100%}
+h1{font-size:1.55rem;letter-spacing:-.02em;margin:4px 0 14px;font-weight:800;line-height:1.2}
+h2{font-size:1.02rem;margin:26px 0 10px;font-weight:800;letter-spacing:-.01em}
 a{color:var(--brand)}
-.hello{margin:4px 0 12px;font-size:1.1rem;font-weight:700;color:var(--mut)}
-.card{background:var(--surface);border:1px solid var(--line);border-radius:20px;padding:16px;margin:0 0 12px;display:block;color:inherit;text-decoration:none;box-shadow:var(--sh);transition:transform .15s,box-shadow .15s}
-a.card:active{transform:scale(.985)}
-.hero{position:relative;overflow:hidden;border:0;border-radius:28px;padding:24px;color:#fff;background:linear-gradient(135deg,#1738C9,#2455F4 55%,#6D8BFF);box-shadow:0 18px 40px rgba(36,85,244,.35)}
-.hero::after{content:"";position:absolute;right:-60px;top:-70px;width:210px;height:210px;border-radius:50%;background:radial-gradient(circle,#ffffff40,transparent 70%)}
-.hero small{opacity:.85;font-weight:600}.hero b{display:block;font-size:2.5rem;font-weight:800;letter-spacing:-.03em;margin:2px 0 12px;font-variant-numeric:tabular-nums}
-.pill{background:#ffffff2e;color:#fff;text-decoration:none;font-weight:700;font-size:.85rem;padding:7px 14px;border-radius:99px;backdrop-filter:blur(6px)}
+main>a:not([class]){display:inline-block;padding:6px 0 10px;font-weight:700;text-decoration:none}
+.hello{margin:2px 0 14px;font-size:1.35rem;font-weight:800;letter-spacing:-.02em}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px;margin:0 0 12px;display:block;color:inherit;text-decoration:none;box-shadow:var(--sh);overflow-wrap:anywhere}
+.card .card{box-shadow:none;background:var(--bg);border-radius:12px}
+a.card{transition:border-color .15s,background-color .15s}
+a.card:active{background:var(--tint)}
+@media(hover:hover){a.card:hover{border-color:var(--brand)}}
+.hero{position:relative;border:0;border-radius:18px;padding:22px;color:#fff;background:var(--hero)}
+.hero small{opacity:.85;font-weight:600;font-size:.85rem}
+.hero b{display:block;font-size:clamp(1.8rem,9vw,2.3rem);font-weight:800;letter-spacing:-.03em;margin:2px 0 12px;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.pill{background:#fff;color:#1747D6;text-decoration:none;font-weight:700;font-size:.85rem;padding:8px 16px;border-radius:99px;white-space:nowrap}
 .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.grid .card{margin:0}
-.stat b{display:block;font-size:1.7rem;font-weight:800;letter-spacing:-.02em}
+@media(min-width:700px){.grid{grid-template-columns:repeat(auto-fill,minmax(190px,1fr))}}
+.stat b{display:block;font-size:clamp(1.05rem,5vw,1.4rem);font-weight:800;letter-spacing:-.02em;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.stat .mut{display:block;margin-top:2px;font-size:.82rem}
 .mut{color:var(--mut);font-size:.9rem}
 label{display:block;font-weight:600;font-size:.85rem;color:var(--mut)}
-input,textarea,select{font:inherit;width:100%;padding:14px;border:1.5px solid var(--line);border-radius:14px;background:var(--bg);color:var(--ink);margin:6px 0 14px}
-input:focus,textarea:focus,select:focus{outline:none;border-color:var(--brand);box-shadow:0 0 0 4px #2455F428}
-button,.btn{font:inherit;font-weight:700;background:var(--brand);color:#fff;border:0;border-radius:14px;padding:12px 18px;margin:4px 8px 4px 0;cursor:pointer;display:inline-block;text-decoration:none;box-shadow:0 8px 18px rgba(36,85,244,.28);text-align:center}
-button.full,.btn.full{display:block;width:100%;margin:6px 0}
-button.alt{background:var(--surface);color:var(--brand);border:1.5px solid var(--line);box-shadow:none}
-button.bad{background:var(--bad);box-shadow:none}
-button:disabled{opacity:.55}
-:focus-visible{outline:3px solid var(--sun);outline-offset:2px}
-.tag{display:inline-block;font-size:.76rem;font-weight:700;padding:3px 10px;border-radius:99px;background:var(--tint);color:var(--brand);margin-right:6px}
-.tag.s{background:#FFF1D1;color:#8A5A00}
+input,textarea,select{font:inherit;font-size:1rem;width:100%;min-height:48px;padding:12px 14px;border:1px solid var(--line);border-radius:12px;background:var(--surface);color:var(--ink);margin:6px 0 14px}
+.card .card input,.card .card textarea,.card .card select{background:var(--surface)}
+textarea{min-height:96px;resize:vertical}
+::placeholder{color:var(--mut);opacity:.8}
+input:focus,textarea:focus,select:focus{outline:none;border-color:var(--brand);box-shadow:0 0 0 3px color-mix(in srgb,var(--brand) 25%,transparent)}
+button,.btn{font:inherit;font-weight:700;font-size:.95rem;background:var(--btn);color:#fff;border:1px solid transparent;border-radius:12px;min-height:44px;padding:10px 18px;margin:4px 8px 4px 0;cursor:pointer;display:inline-block;text-decoration:none;text-align:center;line-height:1.3;transition:filter .15s,background-color .15s}
+@media(hover:hover){button:hover,.btn:hover{filter:brightness(1.08)}}
+button:active,.btn:active{filter:brightness(.92)}
+button.full,.btn.full{display:block;width:100%;margin:8px 0 0}
+button.alt,.btn.alt{background:var(--surface);color:var(--brand);border-color:var(--line)}
+button.bad{background:var(--bad)}
+button:disabled{opacity:.55;cursor:default}
+.row>button,.row>.btn{margin:0;flex:none}
+:focus-visible{outline:3px solid color-mix(in srgb,var(--brand) 55%,transparent);outline-offset:2px}
+.tag{display:inline-block;font-size:.75rem;font-weight:700;line-height:1.4;padding:3px 10px;border-radius:99px;background:var(--tint);color:var(--brand);margin:0 6px 4px 0}
+.tag.s{background:var(--amb-bg);color:var(--amb-ink)}
 .row{display:flex;justify-content:space-between;gap:12px;align-items:center}
-.unread{border-left:4px solid var(--sun)}
-.ico{width:44px;height:44px;border-radius:14px;background:var(--tint);color:var(--brand);display:grid;place-items:center;margin-bottom:10px}
+.row>span,.row>div{min-width:0}
+.unread{border-left:4px solid var(--brand);background:color-mix(in srgb,var(--tint) 55%,var(--surface))}
+.ico{width:44px;height:44px;border-radius:12px;background:var(--tint);color:var(--brand);display:grid;place-items:center;margin-bottom:10px}
 .ico svg,nav svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
 .tile p{margin:4px 0 0}
-nav{position:fixed;left:12px;right:12px;bottom:calc(12px + env(safe-area-inset-bottom));max-width:520px;margin:0 auto;display:flex;gap:2px;padding:6px;border-radius:26px;background:color-mix(in srgb,var(--surface) 82%,transparent);backdrop-filter:blur(18px);border:1px solid var(--line);box-shadow:0 14px 40px rgba(11,21,48,.18)}
-nav a{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;padding:8px 2px;border-radius:20px;color:var(--mut);text-decoration:none;font-size:.7rem;font-weight:700}
+.tile b{font-size:1rem}
+
+/* Navigation : barre basse sur mobile, menu latéral sur grand écran */
+nav{position:fixed;left:0;right:0;bottom:0;display:flex;gap:2px;padding:6px 6px calc(6px + env(safe-area-inset-bottom));background:var(--surface);border-top:1px solid var(--line);z-index:5}
+nav a{flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;min-height:52px;padding:6px 2px;border-radius:12px;color:var(--mut);text-decoration:none;font-size:.64rem;letter-spacing:-.01em;font-weight:700;white-space:nowrap}
 nav a.on{background:var(--tint);color:var(--brand)}
-#toast{position:fixed;top:14px;left:50%;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:12px 18px;border-radius:16px;z-index:9;max-width:92%;display:none;font-weight:600;box-shadow:var(--sh)}
-.auth{padding-top:8vh;text-align:center}.auth form{text-align:left}
-.logo{width:68px;height:68px;border-radius:22px;margin:0 auto 14px;display:grid;place-items:center;color:#fff;font-size:2rem;font-weight:800;background:linear-gradient(135deg,#1738C9,#6D8BFF);box-shadow:0 14px 30px rgba(36,85,244,.4)}
-[hidden]{display:none!important}
-@media(min-width:900px){main{max-width:720px}}
-@media(prefers-reduced-motion:reduce){*{transition:none!important}}
-.btn.alt{background:var(--surface);color:var(--brand);border:1.5px solid var(--line);box-shadow:none}
-.chips{display:flex;overflow-x:auto;padding-bottom:6px;margin-bottom:8px}.chips .btn{white-space:nowrap}
-.action{display:flex;align-items:center;gap:10px;padding:14px;border-radius:16px;background:var(--surface);border:1px solid var(--line);color:inherit;text-decoration:none;font-weight:600;font-size:.88rem}
-.action .ico{margin:0;width:36px;height:36px;flex:none}
-.bars{display:flex;gap:10px;align-items:flex-end;height:150px;margin:16px 0}.bar{flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;height:100%}
-.col{flex:1;width:100%;display:flex;align-items:flex-end;gap:3px}.col i{flex:1;border-radius:6px 6px 0 0;min-height:2px}
-.bg{background:var(--brand)}.bs{background:var(--sun)}.bar span{font-size:.75rem;color:var(--mut)}
-.dot{display:inline-block;width:10px;height:10px;border-radius:3px;margin:0 6px 0 10px}
 nav a.x{display:none}
-@media(min-width:900px){
- body{padding-bottom:24px;padding-left:272px}
- nav{left:16px;right:auto;top:16px;bottom:auto;width:238px;max-width:none;margin:0;flex-direction:column;padding:10px;border-radius:24px}
- nav a{flex-direction:row;gap:12px;padding:12px 14px;font-size:.95rem}
- nav a.x{display:flex}
- main{max-width:860px}
-}
-.sub{font-size:.78rem;font-weight:800;color:var(--mut);text-transform:uppercase;letter-spacing:.05em;margin:18px 0 8px}
-.grid3{display:grid;grid-template-columns:1fr;gap:12px;margin-bottom:12px}.grid3 .card{margin:0}
-@media(min-width:700px){.grid3{grid-template-columns:repeat(3,1fr)}}
+#toast{position:fixed;top:calc(12px + env(safe-area-inset-top));left:50%;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:12px 18px;border-radius:12px;z-index:20;max-width:92%;display:none;font-weight:600;box-shadow:0 8px 24px rgba(15,26,51,.25)}
+.auth{max-width:420px;margin:0 auto;padding-top:7vh;text-align:center}.auth form{text-align:left;margin-top:18px}
+.logo{width:64px;height:64px;border-radius:18px;margin:0 auto 14px;display:grid;place-items:center;color:#fff;font-size:1.9rem;font-weight:800;background:var(--hero)}
+[hidden]{display:none!important}
+@media(prefers-reduced-motion:reduce){*{transition:none!important}}
+
+/* Filtres, onglets, raccourcis */
+.chips{display:flex;gap:8px;overflow-x:auto;padding-bottom:6px;margin-bottom:8px;scrollbar-width:none}
+.chips::-webkit-scrollbar{display:none}
+.chips .btn,.chips button{flex:none;white-space:nowrap;margin:0;padding:8px 16px;min-height:40px;font-size:.88rem;border-radius:99px}
+#feed>div:first-child{display:flex;gap:6px;padding:4px;margin-bottom:12px;background:var(--line);border-radius:14px}
+#feed>div:first-child button{flex:1;margin:0;box-shadow:none}
+#feed>div:first-child button.alt{background:transparent;border-color:transparent;color:var(--mut)}
+#sf{display:flex;gap:8px;align-items:center;padding:10px}
+#sf input{margin:0;flex:1;min-width:0}
+#sf button.full{width:auto;flex:none;margin:0}
+.action{display:flex;align-items:center;gap:10px;padding:12px;border-radius:14px;background:var(--surface);border:1px solid var(--line);color:inherit;text-decoration:none;font-weight:700;font-size:.88rem;min-height:56px}
+.action .ico{margin:0;width:36px;height:36px;flex:none}
+@media(hover:hover){.action:hover{border-color:var(--brand)}}
+.sub{font-size:.8rem;font-weight:700;color:var(--mut);margin:18px 0 8px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:12px}.grid3 .card{margin:0;padding:12px}
+.grid3 .stat b{font-size:1.35rem}.grid3 .stat .mut{font-size:.74rem;line-height:1.25}
 .dim{border-top:4px solid var(--brand)}.dim.r{border-top-color:var(--sun)}.dim.g{border-top-color:#12A150}
 .dim p{margin:6px 0 0}
 
-/* ===== CENTRALE ===== */
-.ct-banner{display:flex;align-items:center;gap:8px;padding:8px 12px;border-radius:12px;background:#FFF6DD;color:#7A5300;font-size:.78rem;font-weight:700;margin:0 0 12px;border:1px solid #FFE4A3}
-@media(prefers-color-scheme:dark){.ct-banner{background:#2A2210;color:#FFD98A;border-color:#4A3B12}}
+/* Évolution */
+.bars{display:flex;gap:10px;align-items:flex-end;height:150px;margin:16px 0}.bar{flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;height:100%}
+.col{flex:1;width:100%;display:flex;align-items:flex-end;gap:3px}.col i{flex:1;border-radius:5px 5px 0 0;min-height:2px}
+.bg{background:var(--brand)}.bs{background:var(--sun)}.bar span{font-size:.75rem;color:var(--mut)}
+.dot{display:inline-block;width:10px;height:10px;border-radius:3px;margin:0 6px 0 10px}
+
+/* ===== LA CENTRALE ===== */
+.ct-banner{display:flex;align-items:center;gap:8px;padding:8px 12px;border-radius:12px;background:var(--amb-bg);color:var(--amb-ink);font-size:.78rem;font-weight:700;margin:0 0 12px}
 .ct-banner svg{width:16px;height:16px;flex:none}
-.ct-search{display:flex;gap:8px;margin:0 0 10px}
+.ct-search{display:flex;gap:8px;margin:0 0 10px;position:sticky;top:env(safe-area-inset-top);z-index:3;padding:6px 0;background:var(--bg)}
 .ct-search input{margin:0;flex:1}
-.ct-cats{display:flex;gap:6px;overflow-x:auto;padding-bottom:6px;margin-bottom:10px}
-.ct-cats button{white-space:nowrap;padding:8px 14px;font-size:.85rem;margin:0}
+.ct-cats{display:flex;gap:8px;overflow-x:auto;padding-bottom:6px;margin-bottom:10px;scrollbar-width:none}
+.ct-cats::-webkit-scrollbar{display:none}
+.ct-cats button{flex:none;white-space:nowrap;padding:8px 16px;min-height:40px;font-size:.88rem;margin:0;border-radius:99px}
 .ct-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 @media(min-width:700px){.ct-grid{grid-template-columns:repeat(3,1fr)}}
-.ct-card{background:var(--surface);border:1px solid var(--line);border-radius:18px;overflow:hidden;color:inherit;text-decoration:none;box-shadow:var(--sh);display:flex;flex-direction:column;transition:transform .15s}
-.ct-card:active{transform:scale(.985)}
-.ct-card .ct-img{aspect-ratio:4/3;background:linear-gradient(135deg,#dfe8ff,#f3f6ff);display:grid;place-items:center;color:var(--brand);font-weight:800;font-size:.9rem;overflow:hidden}
+.ct-card{background:var(--surface);border:1px solid var(--line);border-radius:14px;overflow:hidden;color:inherit;text-decoration:none;box-shadow:var(--sh);display:flex;flex-direction:column;transition:border-color .15s}
+.ct-card:active{background:var(--tint)}
+@media(hover:hover){.ct-card:hover{border-color:var(--brand)}}
+.ct-card .ct-img{aspect-ratio:4/3;background:var(--tint);display:grid;place-items:center;color:var(--brand);font-weight:800;font-size:2rem;overflow:hidden}
 .ct-card .ct-img img{width:100%;height:100%;object-fit:cover;display:block}
 .ct-card .ct-body{padding:10px 12px 12px;display:flex;flex-direction:column;gap:6px;flex:1}
-.ct-card .ct-name{font-weight:800;font-size:.92rem;line-height:1.25;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
-.ct-card .ct-price{font-weight:800;font-size:.98rem;font-variant-numeric:tabular-nums}
-.ct-card .ct-com,.ct-com{font-size:.78rem;font-weight:700;color:#8A5A00}
-@media(prefers-color-scheme:dark){.ct-card .ct-com,.ct-com{color:#FFD98A}}
-.ct-badges{display:flex;gap:6px;flex-wrap:wrap}
-.ct-cert{background:#E7F7EE;color:#0E6B3A}
-@media(prefers-color-scheme:dark){.ct-cert{background:#0E2E1C;color:#8FE7B8}}
+.ct-card .ct-name{font-weight:700;font-size:.92rem;line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.ct-card .ct-price{font-weight:800;font-size:1.05rem;font-variant-numeric:tabular-nums;letter-spacing:-.01em}
+.ct-badges{display:flex;gap:4px;flex-wrap:wrap}
+.ct-badges .tag{margin:0}
+.ct-cert{background:var(--ok-bg);color:var(--ok-ink)}
 .ct-empty{text-align:center;padding:28px 16px;color:var(--mut)}
 .ct-empty b{color:var(--ink);display:block;margin-bottom:6px}
 .ct-loading{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 @media(min-width:700px){.ct-loading{grid-template-columns:repeat(3,1fr)}}
-.ct-skel{aspect-ratio:3/4;border-radius:18px;background:linear-gradient(100deg,var(--line) 20%,color-mix(in srgb,var(--line) 60%,var(--surface)) 40%,var(--line) 60%);background-size:200% 100%;animation:ct-shimmer 1.2s infinite}
+.ct-skel{aspect-ratio:3/4;border-radius:14px;background:linear-gradient(100deg,var(--line) 20%,color-mix(in srgb,var(--line) 60%,var(--surface)) 40%,var(--line) 60%);background-size:200% 100%;animation:ct-shimmer 1.2s infinite}
 @keyframes ct-shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
 @media(prefers-reduced-motion:reduce){.ct-skel{animation:none}}
-.ct-gain{display:inline-block;align-self:flex-start;font-size:.78rem;font-weight:800;padding:3px 10px;border-radius:99px;background:#FFF1D1;color:#8A5A00}
-@media(prefers-color-scheme:dark){.ct-gain{background:#2A2210;color:#FFD98A}}
+.ct-gain{display:inline-block;align-self:flex-start;font-size:.78rem;font-weight:800;padding:3px 10px;border-radius:99px;background:var(--amb-bg);color:var(--amb-ink)}
+.ct-card .ct-com,.ct-com{font-size:.78rem;font-weight:700;color:var(--amb-ink)}
 .ct-rate{font-size:.75rem;color:var(--mut)}
 .ct-stars{color:var(--sun);letter-spacing:1px}
-.ct-steps{display:flex;gap:8px;overflow-x:auto;margin:0 0 12px}
-.ct-steps span{flex:1;min-width:104px;font-size:.78rem;font-weight:700;color:var(--mut);background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:8px 10px}
-.ct-steps b{display:inline-grid;place-items:center;width:20px;height:20px;border-radius:50%;background:var(--tint);color:var(--brand);margin-right:4px;font-size:.72rem}
-.ct-steps4 span{min-width:120px}
-.ct-prev{margin-top:20px;padding:12px;border:1.5px dashed var(--line);border-radius:16px}
+.ct-steps{display:flex;gap:8px;overflow-x:auto;margin:0 0 12px;scrollbar-width:none}
+.ct-steps::-webkit-scrollbar{display:none}
+.ct-steps span{flex:1;min-width:120px;font-size:.78rem;font-weight:700;color:var(--mut);background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px}
+.ct-steps b{display:inline-grid;place-items:center;width:20px;height:20px;border-radius:50%;background:var(--tint);color:var(--brand);margin-right:6px;font-size:.72rem}
+.ct-steps4 span{min-width:132px}
+.ct-prev{margin-top:20px;padding:12px;border:1px dashed var(--line);border-radius:12px}
 .ct-prev .ct-cats{margin:4px 0 8px}
+
+/* Tablette */
+@media(min-width:700px){main{max-width:720px;padding:24px 20px}h1{font-size:1.75rem}}
+
+/* Ordinateur : menu latéral fixe */
+@media(min-width:900px){
+ body{padding-bottom:24px;padding-left:248px}
+ nav{top:0;bottom:0;right:auto;width:248px;flex-direction:column;gap:4px;padding:16px 12px;border-top:0;border-right:1px solid var(--line);overflow-y:auto}
+ nav::before{content:"DropAffy";display:block;padding:6px 14px 18px;font-size:1.25rem;font-weight:800;letter-spacing:-.02em;color:var(--brand)}
+ nav a{flex:none;flex-direction:row;justify-content:flex-start;gap:12px;min-height:44px;padding:10px 14px;font-size:.95rem;letter-spacing:0}
+ nav a.x{display:flex}
+ main{max-width:1000px;padding:32px}
+ .grid3{gap:14px}
+ .grid3 .card{padding:16px}
+ .ct-grid,.ct-loading{grid-template-columns:repeat(4,1fr)}
+}
 </style>
 </head>
 <body>
@@ -223,11 +262,11 @@ async function adminFinance() {
   const p = (pos || [])[0] || {}, M = mo || [], cur = new Date().toISOString().slice(0, 7);
   const st = (v, l) => `<div class="card stat"><b>${fcfa(v)}</b><span class="mut">${l}</span></div>`;
   app.innerHTML = `<a href="#/admin">← Administration</a><h1>Pilotage financier</h1>
-  <div class="grid">${st(p.commissions_dues, 'Commissions dues')}${st(p.soldes_portefeuilles, 'Fonds clients (hors revenus)')}${st(p.reserve_actuelle, 'Réserve actuelle')}${st(p.charges_mensuelles, 'Seuil de survie / mois')}</div>
+  <div class="grid">${st(p.commissions_dues, 'Commissions dues')}${st(p.soldes_portefeuilles, 'Fonds clients (hors revenus)')}${st(p.reserve_actuelle, 'Réserve actuelle')}${st(p.charges_mensuelles, 'Seuil de survie / mois')}${st(p.fonds_ventes_en_attente, 'Ventes encaissées, à répartir')}${st(p.versements_fournisseurs_dus, 'Versements fournisseurs dus')}${st(p.remboursements_a_effectuer, 'Remboursements clients à faire')}</div>
   <div class="card"><b>Réserve cible</b><p class="mut">1 mois : ${fcfa(p.reserve_cible_1_mois)} · 3 mois : ${fcfa(p.reserve_cible_3_mois)} · 6 mois : ${fcfa(p.reserve_cible_6_mois)}<br>Couverture actuelle : ${p.couverture_mois ?? 0} mois · Objectif de revenus : ${fcfa(p.objectif_revenus)}</p></div>
   <h2>Mois par mois</h2>${M.map(m => { const ended = m.mois.slice(0, 7) < cur, can = ended && Number(m.reserve_suggeree) > 0 && Number(m.reserve_allouee) === 0;
     return `<div class="card"><b>${m.mois.slice(0, 7)}</b> <span class="tag${Number(m.disponible) < 0 ? ' s' : ''}">Disponible ${fcfa(m.disponible)}</span>
-    <p class="mut">Encaissé ${fcfa(m.revenus_encaisses)} (abonnements ${fcfa(m.abonnements_fournisseurs)}, contacts ${fcfa(m.contacts_encaisses)}, ambassadeurs ${fcfa(m.abonnements_ambassadeurs)})<br>Commissions d’abonnement ${fcfa(m.commissions_abonnements)} · Charges ${fcfa(m.charges)} (${esc(m.charges_source)})<br>Part plateforme sur ventes, non encaissée : ${fcfa(m.part_plateforme_ventes_non_encaissee)}</p>
+    <p class="mut">Encaissé ${fcfa(m.revenus_encaisses)} (abonnements ${fcfa(m.abonnements_fournisseurs)}, contacts Communauté ${fcfa(m.contacts_encaisses)}, contacts fournisseurs ${fcfa(m.contacts_fournisseurs)}, ambassadeurs ${fcfa(m.abonnements_ambassadeurs)}, part plateforme sur ventes ${fcfa(m.part_plateforme_ventes)})<br>Commissions d’abonnement ${fcfa(m.commissions_abonnements)} · Charges ${fcfa(m.charges)} (${esc(m.charges_source)})</p>
     ${Number(m.reserve_allouee) > 0 ? `<span class="tag">Réserve affectée : ${fcfa(m.reserve_allouee)}</span>` : can ? `<button data-r="${m.mois}">Affecter ${fcfa(m.reserve_suggeree)} à la réserve</button>` : ''}</div>`; }).join('')}
   <h2>Ajouter une charge</h2><form id="xf" class="card"><label>Mois<input name="period" type="month" value="${cur}" required></label><label>Libellé<input name="label" required></label><label>Montant (FCFA)<input name="amount" type="number" min="1" required></label><button class="full">Enregistrer</button></form>
   ${(ex || []).map(x => `<div class="card row"><span>${esc(x.label)}<br><span class="mut">${x.period.slice(0, 7)}</span></span><b>${fcfa(x.amount)}</b></div>`).join('')}`;
@@ -276,14 +315,15 @@ async function home() {
   const opp = (t, cols, owner) => sb.from(t).select(cols).eq('status', t === 'products' ? 'active' : 'approved').neq(owner, me).order('created_at', {ascending:false}).limit(3);
   const live = t => t === 'products' ? opp(t, 'id,title,category,price,created_at', 'created_by') : opp(t, 'id,title,category,city,created_at,expires_at', 'user_id').gt('expires_at', now);
   const mine = t => sb.from(t).select('status').eq('user_id', me).limit(300);
-  const [d, pf, o1, o2, o3, mo, ms, mp, mt, mpr, aff, a1, a2, a3, a4, a5, a6] = await Promise.all([
+  const [d, pf, o1, o2, o3, mo, ms, mp, mt, mpr, aff, a1, a2, a3, a4, a5, a6, fq] = await Promise.all([
     q(sb.rpc('member_dashboard')),
     sb.from('profiles').select('full_name').eq('id', me).maybeSingle(),
     live('offers'), live('searches'), live('products'),
     mine('offers'), mine('searches'), mine('properties'), mine('transport_requests'),
     sb.from('products').select('status').eq('created_by', me).limit(300),
     sb.from('product_leads').select('id,status').eq('user_id', me).eq('kind', 'promote').limit(50),
-    pend('offers'), pend('searches'), pend('properties'), pend('transport_requests'), pend('products'), pend('withdrawal_requests')]);
+    pend('offers'), pend('searches'), pend('properties'), pend('transport_requests'), pend('products'), pend('withdrawal_requests'), state.isAdmin ? sb.rpc('finance_sales_queue') : {data:null}]);
+  const FQ = fq?.data || {};
 
   const name = String(pf.data?.full_name || '').split(' ')[0];
   const pool = [
@@ -308,7 +348,9 @@ async function home() {
     [cpr.rejected || 0, 'produit(s) refusé(s) à corriger', '#/seller'],
     [state.isAdmin && adm, 'publication(s) à valider', '#/admin'],
     [state.isAdmin && a5.count, 'produit(s) à valider', '#/admin/centrale'],
-    [state.isAdmin && a6.count, 'retrait(s) à traiter', '#/admin']
+    [state.isAdmin && a6.count, 'retrait(s) à traiter', '#/admin'],
+    [state.isAdmin && (FQ.to_pay || []).length, 'paiement(s) client à enregistrer', '#/admin'],
+    [state.isAdmin && (FQ.payouts || []).length, 'versement(s) fournisseur à effectuer', '#/admin']
   ].filter(x => x[0] > 0).slice(0, 4);
 
   const QA = [
@@ -427,7 +469,7 @@ async function contacts(){
 const ATABS = [['pub', 'Offres et besoins'], ['requests', 'Demandes'], ['products', 'Produits'], ['affil', 'Affiliations'], ['orders', 'Commandes'], ['ads', 'DropAds']];
 const RST = {pending:'En attente', accepted:'Acceptée', rejected:'Refusée', cancelled:'Annulée'};
 const SOON = {
-  affil:['Mes affiliations', 'Les produits que vous promouvez et les commissions de vos ventes apparaîtront ici. Pour commencer, demandez à promouvoir un produit depuis La Centrale.', '#/centrale', 'Ouvrir La Centrale'],
+  affil:['Mes affiliations', 'Les produits que vous promouvez et les commissions de vos ventes apparaîtront ici. La demande d’affiliation n’est pas encore active.', '#/centrale', 'Ouvrir La Centrale'],
   orders:['Mes commandes', 'Vos achats, et ceux validés grâce à votre lien d’affiliation, apparaîtront ici dès l’ouverture du suivi des commandes.', null, null],
   ads:['DropAds', 'Gagnez de l’argent en partageant des offres ou des services. Ce module ouvrira quand ses règles seront définies.', '#/m/dropads', 'En savoir plus']};
 async function dueInfo() {
@@ -464,8 +506,8 @@ async function activities(tab) {
   } else if (tab === 'affil') {
     const L = (await q(sb.from('product_leads').select('id,status,product_id,products(title)').eq('user_id', state.me.id).eq('kind', 'promote').order('created_at', {ascending:false}).limit(50))) || [];
     const LS2 = {new:'En attente de validation', validated:'Active', refused:'Refusée'};
-    box.innerHTML = '<p class="mut">Vos demandes pour promouvoir des produits de La Centrale. Le suivi des ventes et des commissions n’est pas encore activé.</p>' +
-      (L.map(x => `<a class="card row" href="#/product/${x.product_id}"><span>${esc(x.products?.title)}</span><span class="tag s">${LS2[x.status]}</span></a>`).join('') || '<p class="card mut">Aucune affiliation. Demandez à promouvoir un produit depuis La Centrale.</p>') + '<a class="btn" href="#/centrale">Ouvrir La Centrale</a>';
+    box.innerHTML = '<p class="mut">La demande d’affiliation n’est pas encore active. Vos affiliations apparaîtront ici dès son ouverture.</p>' +
+      (L.map(x => `<a class="card row" href="#/product/${x.product_id}"><span>${esc(x.products?.title)}</span><span class="tag s">${LS2[x.status]}</span></a>`).join('') || '<p class="card mut">Aucune affiliation pour le moment.</p>') + '<a class="btn" href="#/centrale">Ouvrir La Centrale</a>';
   } else if (tab === 'products') {
     box.innerHTML = '<a class="card" href="#/seller"><b>Mes fiches et produits</b><br><span class="mut">Créez des fiches fournisseurs, proposez des produits et traitez les demandes reçues.</span></a>';
   } else {
@@ -570,8 +612,10 @@ async function profile(){
 
 // ===== src/pages/admin.js =====
 async function admin(){
-  const [o,s,m,l,pr,tr,wd,tf]=await Promise.all([sb.from('offers').select('*').eq('status','pending'),sb.from('searches').select('*').eq('status','pending'),
-    sb.from('profiles').select('id,full_name,phone,account_status').order('created_at',{ascending:false}).limit(50),sb.from('admin_logs').select('*').order('created_at',{ascending:false}).limit(15),sb.from('properties').select('*').eq('status','pending'),sb.from('transport_requests').select('*').eq('status','pending'),sb.from('withdrawal_requests').select('*,profiles!withdrawal_requests_user_id_fkey(full_name)').eq('status','pending').order('created_at'),sb.from('tarifs').select('code,amount')]);
+  const [o,s,m,l,pr,tr,wd,tf,fq]=await Promise.all([sb.from('offers').select('*').eq('status','pending'),sb.from('searches').select('*').eq('status','pending'),
+    sb.from('profiles').select('id,full_name,phone,account_status').order('created_at',{ascending:false}).limit(50),sb.from('admin_logs').select('*').order('created_at',{ascending:false}).limit(15),sb.from('properties').select('*').eq('status','pending'),sb.from('transport_requests').select('*').eq('status','pending'),sb.from('withdrawal_requests').select('*,profiles!withdrawal_requests_user_id_fkey(full_name)').eq('status','pending').order('created_at'),sb.from('tarifs').select('code,amount'),sb.rpc('finance_sales_queue')]);
+  const FQ=fq.data||{};
+  const sec=(t,a,f)=>`<h2>${t} (${(a||[]).length})</h2>`+((a||[]).map(f).join('')||'<p class="card mut">Rien à traiter.</p>');
   const TF=Object.fromEntries((tf.data||[]).map(t=>[t.code,t.amount]));
   const P=[...(o.data||[]).map(x=>({...x,k:'offer'})),...(s.data||[]).map(x=>({...x,k:'search'})),...(pr.data||[]).map(x=>({...x,k:'property'})),...(tr.data||[]).map(x=>({...x,k:'transport'}))];
   app.innerHTML=`<a href="#/profile">← Profil</a><h1>Administration</h1><a class="card" href="#/admin/centrale"><b>La Centrale</b><br><span class="mut">Fournisseurs, produits et demandes des membres</span></a><a class="card" href="#/admin/finance"><b>Pilotage financier</b><br><span class="mut">Commissions dues, charges, réserve</span></a><h2>À valider (${P.length})</h2>
@@ -579,6 +623,10 @@ async function admin(){
    <button data-m="approved" data-k="${x.k}" data-i="${x.id}">Valider</button><button class="bad" data-m="rejected" data-k="${x.k}" data-i="${x.id}">Refuser</button></div>`).join('')||'<p class="card mut">Rien en attente.</p>'}
   <h2>Retraits à traiter (${(wd.data||[]).length})</h2>${(wd.data||[]).map(x=>`<div class="card"><b>${new Intl.NumberFormat('fr-FR').format(x.amount)} FCFA</b> <span class="tag">${x.method==='orange_money'?'Orange Money':'Moov Money'}</span><br><span class="mut">${esc(x.profiles?.full_name)} · ${esc(x.phone)} · ${esc(x.reference)}</span><br>
    <button data-w="paid" data-i="${x.id}">Marquer payé</button><button class="bad" data-w="rejected" data-i="${x.id}">Refuser</button></div>`).join('')||'<p class="card mut">Aucun retrait en attente.</p>'}
+  ${sec('Paiements clients à enregistrer',FQ.to_pay,x=>`<div class="card"><b>${esc(x.title)}</b> × ${x.quantity}<br><span class="mut">${fcfa(x.amount)} · ${esc(x.customer)} · ${dt(x.created_at)}</span><br><button data-pay="${x.id}" data-amt="${x.amount}">Enregistrer le paiement</button></div>`)}
+  ${sec('Ventes à valider (après l’ambassadeur)',FQ.to_validate,x=>`<div class="card"><b>${esc(x.title)}</b><br><span class="mut">${fcfa(x.amount)} dont ${fcfa(x.commission)} de commissions · ${esc(x.customer)}</span><br><button data-sv="1" data-i="${x.id}">Valider et libérer</button><button class="bad" data-sv="0" data-i="${x.id}">Refuser</button></div>`)}
+  ${sec('Versements fournisseurs à effectuer',FQ.payouts,x=>`<div class="card"><b>${fcfa(x.amount)}</b> <span class="mut">${esc(x.supplier||'Fournisseur')} · ${dt(x.created_at)}</span><br><button data-po="${x.id}">Marquer payé</button></div>`)}
+  ${sec('Remboursements clients à effectuer',FQ.refunds,x=>`<div class="card"><b>${fcfa(x.amount)}</b> <span class="mut">${esc(x.title)} · ${esc(x.customer)} · ${esc(x.reason||'')}</span><br><button data-rf="${x.id}">Marquer remboursé</button></div>`)}
   <h2>Membres</h2>${(m.data||[]).map(x=>`<div class="card"><b>${esc(x.full_name)}</b> <span class="mut">${esc(x.phone||'')} · ${esc(x.account_status)}</span><br>
    <button class="alt" data-cr="${x.id}">Créditer</button><button class="alt" data-amb="${x.id}">Rendre ambassadeur</button><button class="alt" data-su="${x.id}" data-s="${x.account_status==='active'?'suspended':'active'}">${x.account_status==='active'?'Suspendre':'Réactiver'}</button></div>`).join('')}
   <h2>Journal</h2>${(l.data||[]).map(x=>`<div class="card mut">${dt(x.created_at)} · ${esc(x.action)}</div>`).join('')}`;
@@ -586,6 +634,15 @@ async function admin(){
     if(b.dataset.m==='rejected'){why=prompt('Motif du refus ?');if(!why)return}
     const inC=b.dataset.m==='approved'&&b.dataset.k==='offer'&&confirm('Cette offre est-elle déjà présente dans La Centrale ?\nOK = oui, Annuler = non');
     try{await q(sb.rpc('admin_moderate_publication',{p_type:b.dataset.k,p_id:b.dataset.i,p_decision:b.dataset.m,p_reason:why,p_in_centrale:inC}));admin()}catch(_){}});
+  app.querySelectorAll('[data-pay]').forEach(b=>b.onclick=async()=>{if(!confirm('Confirmer la réception de '+fcfa(Number(b.dataset.amt))+' ?'))return;const ref=prompt('Référence du paiement Mobile Money ?');if(!ref)return;
+    try{await q(sb.rpc('record_sale_payment',{p_sale_id:b.dataset.pay,p_amount:Number(b.dataset.amt),p_reference:ref}));toast('Paiement enregistré.');admin()}catch(_){}});
+  app.querySelectorAll('[data-sv]').forEach(b=>b.onclick=async()=>{const ok=b.dataset.sv==='1';let note=null;
+    if(!ok){note=prompt('Motif du refus ?');if(!note)return}else if(!confirm('Valider la vente et libérer les commissions ?'))return;
+    try{await q(sb.rpc('validate_sale',{p_id:b.dataset.i,p_ok:ok,p_note:note}));toast(ok?'Vente validée.':'Vente refusée.');admin()}catch(_){}});
+  app.querySelectorAll('[data-po]').forEach(b=>b.onclick=async()=>{const ref=prompt('Référence du transfert au fournisseur ?');if(!ref)return;
+    try{await q(sb.rpc('pay_supplier_payout',{p_id:b.dataset.po,p_reference:ref}));toast('Versement enregistré.');admin()}catch(_){}});
+  app.querySelectorAll('[data-rf]').forEach(b=>b.onclick=async()=>{const ref=prompt('Référence du remboursement ?');if(!ref)return;
+    try{await q(sb.rpc('refund_sale',{p_sale_id:b.dataset.rf,p_reference:ref}));toast('Remboursement enregistré.');admin()}catch(_){}});
   app.querySelectorAll('[data-cr]').forEach(b=>b.onclick=async()=>{const a=parseInt(prompt('Montant en FCFA ?'),10),ref=prompt('Référence du paiement reçu ?');if(!a||!ref)return;
     try{await q(sb.rpc('admin_credit_wallet',{p_user_id:b.dataset.cr,p_amount:a,p_reference:ref}));toast('Portefeuille crédité.');admin()}catch(_){}});
   app.querySelectorAll('[data-w]').forEach(b=>b.onclick=async()=>{let note=null;
@@ -611,14 +668,14 @@ const DEMO_MODE = true;
 const DEMO_CATEGORIES = ['Électronique','Maison','Mode','Beauté','Agroalimentaire','Bureautique'];
 const DEMO_WA = '22600000000'; // numéro fictif de démonstration
 const DEMO_PRODUCTS = [
-  {id:'p1', title:'Ventilateur rechargeable 12"', category:'Électronique', price:18500, commission:1500, certified:true, availability:'in_stock', amb:'Ambassadeur Ouaga Centre', image:'', description:'Ventilateur silencieux, batterie 6h, idéal en saison chaude.', conditions:'Garantie 3 mois. Retrait à Ouagadougou.'},
-  {id:'p2', title:'Mixeur manuel 5 vitesses', category:'Maison', price:9500, commission:800, certified:false, availability:'in_stock', amb:'Ambassadeur Maison+', image:'', description:'Mixeur manuel compact, bol 1L, 5 vitesses.', conditions:'Pas de garantie. Livraison possible.'},
-  {id:'p3', title:'Sac à main cuir PU', category:'Mode', price:12500, commission:1200, certified:true, availability:'limited', amb:'Ambassadeur Mode Faso', image:'', description:'Sac à main tendance, cuir PU, 3 coloris.', conditions:'Stock limité. Paiement à la livraison.'},
-  {id:'p4', title:'Savon noir africain 250g', category:'Beauté', price:2500, commission:300, certified:false, availability:'in_stock', amb:'Ambassadeur Karité', image:'', description:'Savon noir traditionnel, karité et cendre.', conditions:'Lot de 10 minimum pour la revente.'},
-  {id:'p5', title:'Riz local 25kg', category:'Agroalimentaire', price:16000, commission:1000, certified:true, availability:'in_stock', amb:'Ambassadeur Bobo', image:'', description:'Riz local parfumé, sac 25kg.', conditions:'Retrait à Bobo-Dioulasso.'},
-  {id:'p6', title:'Imprimante thermique BT', category:'Bureautique', price:45000, commission:3500, certified:true, availability:'unconfirmed', amb:'Ambassadeur Tech', image:'', description:'Imprimante thermique Bluetooth, tickets 58mm.', conditions:'Disponibilité à confirmer. Garantie 6 mois.'},
-  {id:'p7', title:'Chaussures enfant (paire)', category:'Mode', price:6500, commission:600, certified:false, availability:'in_stock', amb:'Ambassadeur Mode Faso', image:'', description:'Chaussures enfant, tailles 24-34.', conditions:'Paiement à la commande.'},
-  {id:'p8', title:'Miel pur 1L', category:'Agroalimentaire', price:7500, commission:700, certified:true, availability:'limited', amb:'Ambassadeur Plateau', image:'', description:'Miel pur de brousse, pot 1L.', conditions:'Stock limité. Retrait à Ouaga.'}
+  {id:'p1', title:'Ventilateur rechargeable 12"', category:'Électronique', price:18500, commission:1500, certified:true, availability:'in_stock', sup:'Ouaga Centre', image:'', description:'Ventilateur silencieux, batterie 6h, idéal en saison chaude.', conditions:'Garantie 3 mois. Retrait à Ouagadougou.'},
+  {id:'p2', title:'Mixeur manuel 5 vitesses', category:'Maison', price:9500, commission:800, certified:false, availability:'in_stock', sup:'Maison+', image:'', description:'Mixeur manuel compact, bol 1L, 5 vitesses.', conditions:'Pas de garantie. Livraison possible.'},
+  {id:'p3', title:'Sac à main cuir PU', category:'Mode', price:12500, commission:1200, certified:true, availability:'limited', sup:'Mode Faso', image:'', description:'Sac à main tendance, cuir PU, 3 coloris.', conditions:'Stock limité. Paiement à la livraison.'},
+  {id:'p4', title:'Savon noir africain 250g', category:'Beauté', price:2500, commission:300, certified:false, availability:'in_stock', sup:'Karité', image:'', description:'Savon noir traditionnel, karité et cendre.', conditions:'Lot de 10 minimum pour la revente.'},
+  {id:'p5', title:'Riz local 25kg', category:'Agroalimentaire', price:16000, commission:1000, certified:true, availability:'in_stock', sup:'Bobo', image:'', description:'Riz local parfumé, sac 25kg.', conditions:'Retrait à Bobo-Dioulasso.'},
+  {id:'p6', title:'Imprimante thermique BT', category:'Bureautique', price:45000, commission:3500, certified:true, availability:'unconfirmed', sup:'Tech', image:'', description:'Imprimante thermique Bluetooth, tickets 58mm.', conditions:'Disponibilité à confirmer. Garantie 6 mois.'},
+  {id:'p7', title:'Chaussures enfant (paire)', category:'Mode', price:6500, commission:600, certified:false, availability:'in_stock', sup:'Mode Faso', image:'', description:'Chaussures enfant, tailles 24-34.', conditions:'Paiement à la commande.'},
+  {id:'p8', title:'Miel pur 1L', category:'Agroalimentaire', price:7500, commission:700, certified:true, availability:'limited', sup:'Plateau', image:'', description:'Miel pur de brousse, pot 1L.', conditions:'Stock limité. Retrait à Ouaga.'}
 ];
 const DEMO_REVIEWS = {
   p1:[{n:'Issa K.', r:5, t:'Très bon produit, mes clients sont satisfaits.', d:'2026-11-10'}, {n:'Aïcha T.', r:4, t:'Bonne commission, livraison rapide.', d:'2026-11-03'}],
@@ -724,33 +781,27 @@ async function centraleProduct(id) {
       <div class="card"><div class="row"><b style="font-size:1.35rem">${fcfa(p.price)}</b><span class="ct-gain">Vous gagnez ${fcfa(p.commission)}</span></div>
         <p style="margin:10px 0 0">${esc(p.description)}</p>
         ${p.conditions ? `<p class="mut" style="margin-top:10px"><b>Conditions :</b> ${esc(p.conditions)}</p>` : ''}
-        <p class="mut" style="margin-top:10px">Proposé par <b>${esc(p.amb)}</b> · le fournisseur reste masqué</p></div>
+        <p class="mut" style="margin-top:10px">Fournisseur : <b>${esc(p.sup)}</b> · ses coordonnées sont sur sa fiche</p></div>
       <div id="ctact"></div>
       <h2>Comment ça marche</h2>
-      <div class="ct-steps ct-steps4"><span><b>1</b> Je demande</span><span><b>2</b> Je promeus</span><span><b>3</b> L’admin confirme la vente</span><span><b>4</b> Je suis payé</span></div>
+      <div class="ct-steps ct-steps4"><span><b>1</b> Je promeus</span><span><b>2</b> Le client paie DropAffy</span><span><b>3</b> L’ambassadeur valide</span><span><b>4</b> Je suis payé</span></div>
       <div id="ctrev"></div>
-      ${DEMO_MODE ? '<div class="ct-prev"><b>Aperçu démo des états</b><div class="mut">Contact</div><div class="ct-cats" id="pc"></div><div class="mut">Affiliation</div><div class="ct-cats" id="pa"></div></div>' : ''}`;
+      ${DEMO_MODE ? '<div class="ct-prev"><b>Aperçu démo des états</b><div class="mut">Contact</div><div class="ct-cats" id="pc"></div></div>' : ''}`;
     const act = document.getElementById('ctact');
     function drawAct() {
       const C = {
-        none:`<button class="full" id="ctc">Contacter l’ambassadeur</button>`,
-        pending:`<div class="card"><span class="tag s">En attente</span><p class="mut" style="margin:6px 0 0">Votre demande est chez ${esc(p.amb)}. Ses références s’afficheront dès qu’il l’aura acceptée.</p></div>`,
-        accepted:`<div class="card"><span class="tag ct-cert">Acceptée</span><p class="mut" style="margin:6px 0 10px">${esc(p.amb)} a accepté votre demande.</p><a class="btn full" href="https://wa.me/${DEMO_WA}" target="_blank" rel="noopener">Écrire sur WhatsApp</a></div>`,
-        refused:`<div class="card"><span class="tag s">Refusée</span><p class="mut" style="margin:6px 0 0">L’ambassadeur n’a pas donné suite. Vous pouvez en contacter un autre.</p></div>`};
-      const A = {
-        none:`<button class="alt full" id="cta">Je veux promouvoir ce produit</button>`,
-        pending:`<div class="card"><span class="tag s">Affiliation en attente de validation</span></div>`,
-        active:`<div class="card"><span class="tag ct-cert">Affiliation active</span><p class="mut" style="margin:6px 0 0">Suivi des ventes et commissions : non activé pour l’instant.</p></div>`};
-      act.innerHTML = C[st.c] + A[st.a];
-      const c = document.getElementById('ctc'), a = document.getElementById('cta');
-      if (c) c.onclick = () => toast('En préparation : l’envoi de la demande sera activé avec le backend.');
-      if (a) a.onclick = () => toast('En préparation : la demande d’affiliation sera activée avec le backend.');
+        none:`<button class="full" id="ctc">Contacter le fournisseur · 100 FCFA</button>`,
+        paid:`<div class="card"><span class="tag ct-cert">Contact réglé</span><p class="mut" style="margin:6px 0 10px">Coordonnées de ${esc(p.sup)}.</p><a class="btn full" href="https://wa.me/${st.wa || DEMO_WA}" target="_blank" rel="noopener">Écrire sur WhatsApp</a></div>`};
+      act.innerHTML = C[st.c === 'paid' ? 'paid' : 'none'] + `<div class="card"><span class="tag s">Bientôt disponible</span><p class="mut" style="margin:6px 0 0">La demande d’affiliation n’est pas encore active.</p></div>`;
+      const c = document.getElementById('ctc');
+      if (c) c.onclick = async () => { if (!confirm('Débiter 100 FCFA de votre portefeuille pour afficher les coordonnées du fournisseur ?')) return;
+        if (DEMO_MODE) { st.c = 'paid'; st.wa = DEMO_WA; drawAct(); drawPrev(); return; }
+        try { const r = await q(sb.rpc('contact_supplier', {p_product_id:id})); st.c = 'paid'; st.wa = norm((r && r[0] ? r[0].whatsapp : '') || ''); drawAct(); } catch (_) {} };
     }
     function drawPrev() {
-      const pc = document.getElementById('pc'), pa = document.getElementById('pa'); if (!pc) return;
+      const pc = document.getElementById('pc'); if (!pc) return;
       const mk = (key, items) => items.map(([v, l]) => `<button type="button" class="${st[key] === v ? '' : 'alt'}" data-k="${key}" data-v="${v}">${l}</button>`).join('');
-      pc.innerHTML = mk('c', [['none', 'Aucune'], ['pending', 'En attente'], ['accepted', 'Acceptée'], ['refused', 'Refusée']]);
-      pa.innerHTML = mk('a', [['none', 'Aucune'], ['pending', 'En attente'], ['active', 'Active']]);
+      pc.innerHTML = mk('c', [['none', 'Non payé'], ['paid', 'Payé']]);
       app.querySelectorAll('.ct-prev [data-k]').forEach(b => b.onclick = () => { st[b.dataset.k] = b.dataset.v; drawAct(); drawPrev(); });
     }
     async function drawRev() {
