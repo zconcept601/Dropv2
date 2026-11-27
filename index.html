@@ -155,6 +155,44 @@ nav a.x{display:none}
  .grid3 .card{padding:16px}
  .ct-grid,.ct-loading{grid-template-columns:repeat(4,1fr)}
 }
+
+/* ===== MON ACTIVITÉ ===== */
+.act-head{margin-bottom:12px}.act-head h1{margin-bottom:4px}.act-head p{margin:0}
+.act-new{margin:0 0 14px}
+.act-new summary{list-style:none;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;min-height:48px;padding:10px 18px;border-radius:12px;border:1px solid transparent;background:var(--btn);color:#fff;font-weight:700}
+.act-new summary::-webkit-details-marker{display:none}
+.act-new summary svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+.act-new[open] summary{background:var(--surface);color:var(--brand);border-color:var(--line)}
+.act-new-list{display:grid;gap:8px;margin-top:8px}
+.act-new-list a{display:flex;align-items:center;gap:12px;padding:12px;border:1px solid var(--line);border-radius:14px;background:var(--surface);color:inherit;text-decoration:none;min-height:60px}
+.act-new-list .ico{margin:0;flex:none}
+@media(hover:hover){.act-new-list a:hover{border-color:var(--brand)}}
+.act-ov{grid-template-columns:1fr 1fr;margin-bottom:16px}
+.act-tile .act-sub{display:block;margin-top:4px;font-size:.76rem;font-weight:700;color:var(--brand)}
+.act-chips{margin:0 -16px 12px;padding:0 16px 8px}
+.act-chip{flex:none;display:inline-flex;align-items:center;gap:6px;white-space:nowrap;padding:8px 14px;min-height:40px;border-radius:99px;border:1px solid var(--line);background:var(--surface);color:var(--mut);font-weight:700;font-size:.88rem;text-decoration:none}
+.act-chip.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.act-chip i{font-style:normal;font-size:.72rem;min-width:20px;padding:1px 6px;border-radius:99px;background:var(--tint);color:var(--brand);text-align:center}
+.act-chip.on i{background:var(--bg);color:var(--ink)}
+.act-h{display:flex;align-items:baseline;gap:8px;margin:18px 0 8px}
+.act-pub{display:flex;flex-direction:column;gap:6px}
+.act-pub .row{margin:0}
+.act-pub .act-title{font-size:1rem;line-height:1.3}
+.act-st.ok{background:var(--ok-bg);color:var(--ok-ink)}
+.act-st.wait{background:var(--amb-bg);color:var(--amb-ink)}
+.act-st.bad{background:color-mix(in srgb,var(--bad) 14%,var(--surface));color:color-mix(in srgb,var(--bad) 70%,var(--ink))}
+.act-st.off{background:var(--line);color:var(--mut)}
+.act-req p{margin:8px 0}
+.act-empty{text-align:center;padding:28px 18px}
+.act-empty .ico{margin:0 auto 12px}
+.act-empty p{margin:6px auto 14px;max-width:36ch}
+.act-empty .btn{margin:4px}
+@media(min-width:700px){
+ .act-new-list{grid-template-columns:repeat(3,1fr)}
+ .act-new summary{display:inline-flex;min-width:260px}
+ .act-ov{grid-template-columns:repeat(4,1fr)}
+ .act-chips{margin:0 0 12px;padding:0 0 8px}
+}
 </style>
 </head>
 <body>
@@ -484,35 +522,72 @@ function bindPay(after) {
   b.onclick = async () => { if (!confirm('Régler vos mises en relation depuis votre portefeuille ?')) return;
     try { const t = await q(sb.rpc('pay_contact_charges')); toast(fcfa(t) + ' réglés.'); after(); } catch (_) {} };
 }
+// --- Mon activité : espace personnel (mêmes tables, mêmes routes, mêmes traitements) ---
+const PUBK = {offer:'Offres', search:'Besoins', property:'Immobilier', transport:'Transport'};
+const actSt = s => ({approved:'ok', fulfilled:'ok', pending:'wait', rejected:'bad', expired:'off'}[s] || 'wait');
+function actEmpty(ic, title, text, acts) {
+  return `<div class="card act-empty"><span class="ico">${icon(ic)}</span><b>${title}</b><p class="mut">${text}</p>${acts || ''}</div>`;
+}
+function actPubCard(x) {
+  const note = x.status === 'approved' && x.expires_at ? 'Visible jusqu’au ' + dt(x.expires_at) : x.status === 'pending' ? 'En attente de validation par l’équipe' : '';
+  return `<a class="card act-pub" href="#/p/${x.k}/${x.id}"><div class="row"><span class="tag act-st ${actSt(x.status)}">${esc(STATUS[x.status] || x.status)}</span><span class="mut">${x.created_at ? dt(x.created_at) : ''}</span></div>
+    <b class="act-title">${esc(x.title)}</b>${note ? `<span class="mut">${note}</span>` : ''}</a>`;
+}
 async function activities(tab) {
   tab = ATABS.some(x => x[0] === tab) ? tab : 'pub';
-  app.innerHTML = `<h1>Mes activités</h1><div class="chips">${ATABS.map(([k, l]) => `<a class="btn ${tab === k ? '' : 'alt'}" href="#/activity/${k}">${l}</a>`).join('')}</div><div id="tab"></div>`;
-  const box = document.getElementById('tab');
+  const me = state.me.id;
+  const chips = (c = {}) => ATABS.map(([k, l]) => `<a class="act-chip${tab === k ? ' on' : ''}" href="#/activity/${k}"${tab === k ? ' aria-current="true"' : ''}>${l}${c[k] ? `<i>${c[k]}</i>` : ''}</a>`).join('');
+  const newBtns = '<a class="btn" href="#/publish">Publier une offre</a><a class="btn alt" href="#/publish/search">Publier un besoin</a>';
+  app.innerHTML = `<div class="act-head"><h1>Mon activité</h1><p class="mut">Suivez au même endroit vos publications, vos besoins, vos demandes et vos produits.</p></div>
+  <details class="act-new"><summary>${icon('plus')}Créer une publication</summary><div class="act-new-list">
+    <a href="#/publish"><span class="ico">${icon('plus')}</span><span><b>Offre</b><br><span class="mut">Je propose un produit ou un service</span></span></a>
+    <a href="#/publish/search"><span class="ico">${icon('file')}</span><span><b>Besoin</b><br><span class="mut">Je cherche un fournisseur ou un prestataire</span></span></a>
+    <a href="#/seller"><span class="ico">${icon('store')}</span><span><b>Produit</b><br><span class="mut">Fiches fournisseurs et produits La Centrale</span></span></a></div></details>
+  <div id="actov"></div><div class="chips act-chips" id="actchips">${chips()}</div><div id="tab"></div>`;
+  const ov = document.getElementById('actov'), cw = document.getElementById('actchips'), box = document.getElementById('tab');
+  box.innerHTML = '<p class="card mut" aria-busy="true">Chargement…</p>';
+  const mine = t => sb.from(t).select('id,title,status,created_at,expires_at').eq('user_id', me).order('created_at', {ascending:false}).limit(100);
+  const [o, s, p, t, rq, pr, lf, due] = await Promise.all([mine('offers'), mine('searches'), mine('properties'), mine('transport_requests'),
+    sb.from('contact_requests').select('*').order('created_at', {ascending:false}).limit(50),
+    sb.from('products').select('status').eq('created_by', me).limit(300),
+    sb.from('product_leads').select('id,status,product_id,products(title)').eq('user_id', me).eq('kind', 'promote').order('created_at', {ascending:false}).limit(50),
+    tab === 'requests' ? dueInfo() : null]);
+  const pubs = [...(o.data || []).map(x => ({...x, k:'offer'})), ...(s.data || []).map(x => ({...x, k:'search'})), ...(p.data || []).map(x => ({...x, k:'property'})), ...(t.data || []).map(x => ({...x, k:'transport'}))];
+  const R = (rq.data || []).filter(r => r.recipient_id === me || r.requester_id === me);
+  const toDo = R.filter(r => r.recipient_id === me && r.status === 'pending').length;
+  const PR = pr.data || [], L = lf.data || [];
+  const ofKind = k => pubs.filter(x => x.k === k);
+  const offers = pubs.filter(x => x.k !== 'search'), needs = ofKind('search');
+  const live = a => a.filter(x => x.status === 'approved').length;
+  const tile = (h, n, l, sub) => `<a class="card stat act-tile" href="${h}"><b>${n}</b><span class="mut">${l}</span>${sub ? `<span class="act-sub">${sub}</span>` : ''}</a>`;
+  ov.innerHTML = `<div class="grid act-ov">${tile('#/activity/pub', offers.length, 'Publications', offers.length ? live(offers) + ' publiée(s)' : '')}
+    ${tile('#/activity/pub', needs.length, 'Besoins', needs.length ? live(needs) + ' publié(s)' : '')}
+    ${tile('#/activity/requests', toDo, 'Demandes à traiter', R.length ? R.length + ' au total' : '')}
+    ${tile('#/activity/products', PR.length, 'Produits', PR.length ? PR.filter(x => x.status === 'active').length + ' actif(s)' : '')}</div>`;
+  cw.innerHTML = chips({pub:pubs.length, requests:toDo, products:PR.length, affil:L.length});
   if (tab === 'pub') {
-    const mine = t => sb.from(t).select('id,title,status').eq('user_id', state.me.id).order('created_at', {ascending:false}).limit(20);
-    const [o, s, p, t] = await Promise.all([mine('offers'), mine('searches'), mine('properties'), mine('transport_requests')]);
-    const all = [...(o.data || []).map(x => ({...x, k:'offer', l:'Offre'})), ...(s.data || []).map(x => ({...x, k:'search', l:'Besoin'})), ...(p.data || []).map(x => ({...x, k:'property', l:'Immobilier'})), ...(t.data || []).map(x => ({...x, k:'transport', l:'Transport'}))];
-    box.innerHTML = `<p><a class="btn" href="#/publish">Publier une offre</a><a class="btn alt" href="#/publish/search">Publier un besoin</a></p>` +
-      (all.map(x => `<a class="card row" href="#/p/${x.k}/${x.id}"><span><span class="tag">${x.l}</span>${esc(x.title)}</span><span class="tag s">${esc(STATUS[x.status] || x.status)}</span></a>`).join('') || '<p class="card mut">Vous n’avez encore rien publié.</p>');
+    const groups = Object.keys(PUBK).map(k => [k, ofKind(k)]).filter(g => g[1].length);
+    box.innerHTML = groups.map(([k, a]) => `<h2 class="act-h">${PUBK[k]} <span class="mut">${a.length}</span></h2>${a.map(actPubCard).join('')}`).join('')
+      || actEmpty('file', 'Vous n’avez encore rien publié', 'Publiez une offre pour proposer un produit ou un service, ou un besoin pour que le réseau vous réponde. Chaque publication est validée par l’équipe avant d’apparaître.', newBtns);
   } else if (tab === 'requests') {
-    const [rq, due] = await Promise.all([sb.from('contact_requests').select('*').order('created_at', {ascending:false}).limit(50), dueInfo()]);
-    const R = (rq.data || []).filter(r => r.recipient_id === state.me.id || r.requester_id === state.me.id);
     box.innerHTML = `${dueCard(due)}
-    ${R.map(r => { const rec = r.recipient_id === state.me.id; return `<div class="card"><span class="tag">${rec ? 'Reçue' : 'Envoyée'}</span><span class="tag s">${RST[r.status]}</span> <span class="mut">${dt(r.created_at)}</span>
-     <p>${esc(r.message || '(sans message)')}</p>${r.status === 'pending' ? (rec ? `<button data-a="accepted" data-i="${r.id}">Accepter</button><button class="alt" data-a="rejected" data-i="${r.id}">Refuser</button>` : `<button class="alt" data-a="cancelled" data-i="${r.id}">Annuler</button>`) : ''}</div>`; }).join('') || '<p class="card mut">Aucune demande.</p>'}`;
+    ${R.map(r => { const rec = r.recipient_id === me; return `<div class="card act-req"><div class="row"><span><span class="tag">${rec ? 'Reçue' : 'Envoyée'}</span><span class="tag act-st ${actSt(r.status)}">${RST[r.status]}</span></span><span class="mut">${dt(r.created_at)}</span></div>
+     <p>${esc(r.message || '(sans message)')}</p>${r.status === 'pending' ? (rec ? `<button data-a="accepted" data-i="${r.id}">Accepter</button><button class="alt" data-a="rejected" data-i="${r.id}">Refuser</button>` : `<button class="alt" data-a="cancelled" data-i="${r.id}">Annuler</button>`) : ''}</div>`; }).join('')
+      || actEmpty('contacts', 'Aucune demande pour le moment', 'Quand quelqu’un vous demande une mise en relation, ou que vous en envoyez une depuis une publication, elle apparaît ici.', '<a class="btn" href="#/community">Parcourir la communauté</a>')}`;
     bindPay(() => activities('requests'));
     box.querySelectorAll('[data-a]').forEach(b => b.onclick = async () => { if (b.dataset.a === 'accepted' && !confirm('Accepter ? Des frais de mise en relation pourront être dus selon la publication.')) return;
       try { await q(sb.from('contact_requests').update({status:b.dataset.a}).eq('id', b.dataset.i)); activities('requests'); } catch (_) {} });
   } else if (tab === 'affil') {
-    const L = (await q(sb.from('product_leads').select('id,status,product_id,products(title)').eq('user_id', state.me.id).eq('kind', 'promote').order('created_at', {ascending:false}).limit(50))) || [];
     const LS2 = {new:'En attente de validation', validated:'Active', refused:'Refusée'};
     box.innerHTML = '<p class="mut">La demande d’affiliation n’est pas encore active. Vos affiliations apparaîtront ici dès son ouverture.</p>' +
-      (L.map(x => `<a class="card row" href="#/product/${x.product_id}"><span>${esc(x.products?.title)}</span><span class="tag s">${LS2[x.status]}</span></a>`).join('') || '<p class="card mut">Aucune affiliation pour le moment.</p>') + '<a class="btn" href="#/centrale">Ouvrir La Centrale</a>';
+      (L.map(x => `<a class="card row" href="#/product/${x.product_id}"><span>${esc(x.products?.title)}</span><span class="tag s">${LS2[x.status]}</span></a>`).join('')
+        || actEmpty('link', 'Aucune affiliation pour le moment', 'Choisissez un produit dans La Centrale pour le promouvoir et gagner une commission.', '<a class="btn" href="#/centrale">Ouvrir La Centrale</a>'));
   } else if (tab === 'products') {
-    box.innerHTML = '<a class="card" href="#/seller"><b>Mes fiches et produits</b><br><span class="mut">Créez des fiches fournisseurs, proposez des produits et traitez les demandes reçues.</span></a>';
+    box.innerHTML = PR.length ? `<a class="card" href="#/seller"><b>Mes fiches et produits</b><br><span class="mut">Créez des fiches fournisseurs, proposez des produits et traitez les demandes reçues.</span></a>`
+      : actEmpty('store', 'Aucun produit pour le moment', 'Créez une fiche fournisseur, puis proposez vos produits à La Centrale et traitez les demandes reçues.', '<a class="btn" href="#/seller">Mes fiches et produits</a>');
   } else {
-    const [t, x, h, l] = SOON[tab];
-    box.innerHTML = `<div class="card"><span class="tag s">Bientôt</span><h2 style="margin-top:8px">${t}</h2><p class="mut">${x}</p>${h ? `<a class="btn" href="${h}">${l}</a>` : ''}</div>`;
+    const [ti, x, h, l] = SOON[tab];
+    box.innerHTML = `<div class="card act-empty"><span class="tag s">Bientôt</span><b>${ti}</b><p class="mut">${x}</p>${h ? `<a class="btn" href="${h}">${l}</a>` : ''}</div>`;
   }
 }
 async function notifications() {
