@@ -71,11 +71,8 @@ nav a.x{display:none}
  nav a.x{display:flex}
  main{max-width:860px}
 }
-.sub{font-size:.78rem;font-weight:800;color:var(--mut);text-transform:uppercase;letter-spacing:.05em;margin:18px 0 8px}
 .grid3{display:grid;grid-template-columns:1fr;gap:12px;margin-bottom:12px}.grid3 .card{margin:0}
 @media(min-width:700px){.grid3{grid-template-columns:repeat(3,1fr)}}
-.dim{border-top:4px solid var(--brand)}.dim.r{border-top-color:var(--sun)}.dim.g{border-top-color:#12A150}
-.dim p{margin:6px 0 0}
 
 /* ===== CENTRALE ===== */
 .ct-banner{display:flex;align-items:center;gap:8px;padding:8px 12px;border-radius:12px;background:#FFF6DD;color:#7A5300;font-size:.78rem;font-weight:700;margin:0 0 12px;border:1px solid #FFE4A3}
@@ -461,21 +458,17 @@ async function contacts(){
    ===== src/pages/activities.js — VOLET ACTIVITÉ (refonte + corrections) ===
    ========================================================================= */
 
-const ATABS = [['pub', 'Offres et besoins'], ['requests', 'Demandes'], ['products', 'Produits'], ['affil', 'Affiliations'], ['orders', 'Commandes'], ['ads', 'DropAds']];
 const RST = {pending:'En attente', accepted:'Acceptée', rejected:'Refusée', cancelled:'Annulée'};
-const SOON = {
-  affil:['Mes affiliations', 'Les produits que vous promouvez et les commissions de vos ventes apparaîtront ici. La demande d’affiliation n’est pas encore active.', '#/centrale', 'Ouvrir La Centrale'],
-  orders:['Mes commandes', 'Vos achats, et ceux validés grâce à votre lien d’affiliation, apparaîtront ici dès l’ouverture du suivi des commandes.', null, null],
-  ads:['DropAds', 'Gagnez de l’argent en partageant des offres ou des services. Ce module ouvrira quand ses règles seront définies.', '#/m/dropads', 'En savoir plus']};
 
-// --- A. Isolation des frais : la RLS sur contact_charges garantit que chaque
-//         membre ne voit que ses propres frais. Aucun filtre client fiable
-//         n'est possible sans nom de colonne de rattachement (non identifiable
-//         dans le fichier). On conserve donc status='due' + RLS serveur.
 async function dueInfo() {
-  const r = await sb.from('contact_charges').select('amount').eq('status', 'due');
-  if (r.error) throw r.error;
-  const a = r.data || []; return {n:a.length, sum:a.reduce((t, x) => t + Number(x.amount), 0)};
+  try {
+    const r = await sb.from('contact_charges').select('amount').eq('payer_id', state.me.id).eq('status', 'due');
+    if (r.error) throw r.error;
+    const a = r.data || []; return {n:a.length, sum:a.reduce((t, x) => t + Number(x.amount), 0)};
+  } catch (e) {
+    console.warn('dueInfo', e);
+    return {n:0, sum:0};
+  }
 }
 function dueCard(d) {
   return `<div class="card act-due"><div class="row"><div><b>${d.n}</b> mise(s) en relation à régler : <b>${fcfa(d.sum)}</b><br><span class="mut">Le règlement se fait après chaque lot de 5. À 5 en attente, les nouvelles mises en relation sont bloquées.</span></div>${d.n ? '<button id="pay">Régler</button>' : ''}</div></div>`;
@@ -500,7 +493,7 @@ async function activityHub() {
     let x = sb.from(t).select('*', {count:'exact', head:true});
     if (f) x = f(x);
     const r = await x;
-    if (r.error) throw r.error;
+    if (r.error) { console.warn(t, r.error); return 0; }
     return r.count || 0;
   };
   const mineStatus = async t => {
@@ -860,10 +853,7 @@ function soon(id) {
 
 // ===== src/data/centrale-demo.js =====
 const DEMO_MODE = false;
-const DEMO_CATEGORIES = ['Électronique','Maison','Mode','Beauté','Agroalimentaire','Bureautique'];
 const DEMO_WA = '22600000000';
-const DEMO_PRODUCTS = [];
-const DEMO_REVIEWS = {};
 
 // ===== src/services/centrale.js =====
 const centraleService = (() => {
@@ -1027,16 +1017,24 @@ function comingSoonCt(title, text) {
     <div class="card"><span class="tag s">En préparation</span><p class="mut">${esc(text)}</p></div>`;
 }
 
+let rid = 0;
 async function route() {
-  if (!state.me) return authView(boot);
+  const my = ++rid;
+  if (!state.me) { if (my === rid) authView(boot); return; }
   setNav();
   const [, k = '', a, b] = (location.hash || '#/').split('/');
-  if (k === 'admin' && !state.isAdmin) { app.innerHTML = '<p class="card">Accès refusé : réservé aux administrateurs.</p>'; return; }
+  if (k === 'admin' && !state.isAdmin) { if (my === rid) app.innerHTML = '<p class="card">Accès refusé : réservé aux administrateurs.</p>'; return; }
   const fn = ROUTES[k];
-  if (!fn) { app.innerHTML = '<p class="card">Page introuvable.</p>'; return; }
-  loading();
-  try { await fn(a, b); }
-  catch (_) { app.innerHTML = '<p class="card">Impossible de charger cet écran. Vérifiez votre connexion puis réessayez.</p>'; }
+  if (!fn) { if (my === rid) app.innerHTML = '<p class="card">Page introuvable.</p>'; return; }
+  if (my === rid) loading();
+  try {
+    await fn(a, b);
+    if (my !== rid) return;
+  } catch (e) {
+    console.error(e);
+    if (my !== rid) return;
+    app.innerHTML = '<p class="card">Impossible de charger cet écran. Vérifiez votre connexion puis réessayez.</p>' + (e?.message ? `<p class="card mut">${esc(e.message)}</p>` : '');
+  }
 }
 async function boot() { const s = await loadSession(); state.me = s.user; state.isAdmin = s.admin; state.isAmbassador = s.amb; route(); }
 
